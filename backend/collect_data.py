@@ -1,5 +1,7 @@
 """Universe discovery + incremental OHLCV collection.
 
+Exit codes: 0 ok | 1 partial failures (data still usable, commit it) | 2 fatal (nothing usable, stop).
+
 Usage:
   python -m backend.collect_data                 # daily incremental run
   python -m backend.collect_data --full          # full re-download from 2020-01-01
@@ -183,7 +185,14 @@ def main(argv: list[str] | None = None) -> int:
 
     client, now = YuantaClient(), now_vn()
     failures: list[dict] = []
-    uni = discover_universe(client, failures)
+    try:
+        uni = discover_universe(client, failures)
+    except YuantaAPIError as e:
+        log.error("FATAL: universe discovery failed: %s", e)
+        return 2
+    if not uni["stocks"]:
+        log.error("FATAL: no stocks discovered. Failures: %s", failures[:5])
+        return 2
     type_counts = Counter(str(s["type"]) for s in uni["stocks"])
     log.info("universe: %d indexes, %d listed symbols, types=%s", len(uni["indexes"]), len(uni["stocks"]), dict(type_counts))
     if args.universe_only:
@@ -234,9 +243,11 @@ def main(argv: list[str] | None = None) -> int:
                     "adjusted": counts["adjusted"], "empty": counts["empty"], "failed": len(failures)},
         "failures": failures[:200],
     })
+    for f in failures[:10]:
+        log.error("failure: %s %s -> %s", f["kind"], f["symbol"], f["error"])
     if not bench_ok:
         log.error("benchmark %s failed", C.BENCHMARK)
-        return 1
+        return 1 if not bench.empty else 2   # 2 = nothing usable stored at all
     if attempted and len(failures) / max(attempted, 1) > 0.2:
         log.error("failure rate too high: %d/%d", len(failures), attempted)
         return 1
