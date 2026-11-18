@@ -1,0 +1,61 @@
+name: Daily update
+
+on:
+  schedule:
+    - cron: "0 9 * * 1-5"      # 09:00 UTC = 16:00 Vietnam time, Mon-Fri (after the 15:00 close)
+  workflow_dispatch:
+
+# One writer at a time; a late run waits instead of racing the previous one.
+concurrency:
+  group: market-data-update
+  cancel-in-progress: false
+
+permissions:
+  contents: write              # GITHUB_TOKEN pushes the data commit; no personal access token needed
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: pip install -r requirements.txt
+
+      - name: Unit tests
+        run: python -m pytest -q
+
+      - name: Collect (universe + incremental OHLCV)
+        id: collect
+        continue-on-error: true     # partial failures must not discard the symbols that did update
+        run: python -m backend.collect_data
+
+      - name: Indicators
+        run: python -m backend.calculate_indicators
+
+      - name: Breadth
+        run: python -m backend.calculate_breadth
+
+      - name: Validate data integrity
+        run: python -m backend.validate_data
+
+      - name: Commit and push (only if something changed)
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A data
+          if git diff --cached --quiet; then echo "No data changes - nothing to commit"; exit 0; fi
+          git commit -m "data: update $(date -u +%F)"
+          for i in 1 2 3; do
+            git pull --rebase origin "${GITHUB_REF_NAME}" && git push origin "HEAD:${GITHUB_REF_NAME}" && break
+            sleep $((i * 5))
+          done
+
+      - name: Fail the run if collection had a fatal problem
+        if: steps.collect.outcome == 'failure'
+        run: |
+          echo "::error::collect_data exited non-zero (benchmark failed or >20% of requests failed). See data/monitor/status.json"
+          exit 1

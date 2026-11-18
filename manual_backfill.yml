@@ -1,0 +1,60 @@
+name: Manual backfill
+
+on:
+  workflow_dispatch:
+    inputs:
+      full:
+        description: "Re-download full history from 2020-01-01 (use after corporate-action adjustments)"
+        type: boolean
+        default: true
+      symbols:
+        description: "Optional comma-separated subset, e.g. VIC,VHM,VNINDEX (empty = everything)"
+        type: string
+        default: ""
+
+concurrency:
+  group: market-data-update
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  backfill:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Collect
+        id: collect
+        continue-on-error: true
+        env:
+          FULL: ${{ inputs.full }}
+          SYMBOLS: ${{ inputs.symbols }}
+        run: |
+          ARGS=""
+          if [ "$FULL" = "true" ]; then ARGS="$ARGS --full"; fi
+          if [ -n "$SYMBOLS" ]; then ARGS="$ARGS --symbols $SYMBOLS"; fi
+          python -m backend.collect_data $ARGS
+      - run: python -m backend.calculate_indicators
+      - run: python -m backend.calculate_breadth
+      - run: python -m backend.validate_data
+      - name: Commit and push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A data
+          if git diff --cached --quiet; then echo "No changes"; exit 0; fi
+          git commit -m "data: backfill $(date -u +%F)"
+          for i in 1 2 3; do
+            git pull --rebase origin "${GITHUB_REF_NAME}" && git push origin "HEAD:${GITHUB_REF_NAME}" && break
+            sleep $((i * 5))
+          done
+      - name: Fail if collection failed
+        if: steps.collect.outcome == 'failure'
+        run: exit 1
