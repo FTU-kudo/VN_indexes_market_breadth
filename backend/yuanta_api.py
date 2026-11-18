@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import logging
 import math
+import os
 import re
 from datetime import date, datetime
 from typing import Any
@@ -130,7 +131,12 @@ def make_session() -> requests.Session:
     retry = Retry(total=C.HTTP_RETRIES, backoff_factor=1.0, status_forcelist=(429, 500, 502, 503, 504),
                   allowed_methods=("GET",), respect_retry_after_header=True)
     s.mount("https://", HTTPAdapter(max_retries=retry, pool_maxsize=C.MAX_WORKERS * 2))
-    s.headers.update({"User-Agent": "vietnam-market-intelligence/1.0", "Accept": "application/json"})
+    s.headers.update({
+        "User-Agent": os.environ.get("YUANTA_USER_AGENT", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
+                                    "(KHTML, like Gecko) Chrome/124.0 Safari/537.36"),
+        "Accept": "application/json, text/plain, */*",
+        "Referer": C.BASE + "/",
+    })
     return s
 
 
@@ -142,10 +148,14 @@ class YuantaClient:
     def _get(self, url: str, params: dict | None = None) -> Any:
         try:
             r = self.session.get(url, params=params, timeout=self.timeout)
-            r.raise_for_status()
+        except requests.RequestException as e:
+            raise YuantaAPIError(f"GET {url} {params}: {type(e).__name__}: {e}") from e
+        if r.status_code >= 400:  # keep the body: WAF / geo-block pages explain themselves
+            raise YuantaAPIError(f"HTTP {r.status_code} {r.reason} for {r.url} :: {r.text[:200]!r}")
+        try:
             return r.json()
-        except (requests.RequestException, ValueError) as e:
-            raise YuantaAPIError(f"GET {url} {params}: {e}") from e
+        except ValueError as e:
+            raise YuantaAPIError(f"non-JSON response ({r.headers.get('content-type')}) from {r.url} :: {r.text[:200]!r}") from e
 
     def list_indexes(self) -> list[dict]:
         return parse_index_list(self._get(C.URL_INDEX_LIST))
