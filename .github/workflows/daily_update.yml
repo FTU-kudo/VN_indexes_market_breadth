@@ -1,17 +1,16 @@
 name: Daily update
 
 on:
-  schedule:
-    - cron: "0 9 * * 1-5"      # 09:00 UTC = 16:00 Vietnam time, Mon-Fri (after the 15:00 close)
+  # schedule:
+  #   - cron: "0 9 * * 1-5"      # 09:00 UTC = 16:00 Vietnam time, Mon-Fri
   workflow_dispatch:
 
-# One writer at a time; a late run waits instead of racing the previous one.
 concurrency:
   group: market-data-update
   cancel-in-progress: false
 
 permissions:
-  contents: write              # GITHUB_TOKEN pushes the data commit; no personal access token needed
+  contents: write
 
 jobs:
   update:
@@ -24,24 +23,31 @@ jobs:
           python-version: "3.11"
           cache: pip
       - run: pip install -r requirements.txt
-
-      - name: Unit tests
-        run: python -m pytest -q
-
+      - run: python -m pytest -q
+      - name: Probe Yuanta API from this runner (diagnostic)
+        continue-on-error: true
+        run: |
+          B=https://ysradar.yuanta.com.vn
+          for u in "$B/api/v3/market_data/price_board/index/list_index" \
+                   "$B/v2/tradingview/history?symbol=VNINDEX&resolution=1D&from=1577811600&to=$(date +%s)&limit=5"; do
+            echo "== $u"
+            curl -sS -m 20 -A "Mozilla/5.0" -e "$B/" -o /tmp/body -D /tmp/hdr \
+                 -w "http=%{http_code} ip=%{remote_ip} t=%{time_total}s\n" "$u" || echo "curl failed rc=$?"
+            head -n 3 /tmp/hdr; head -c 300 /tmp/body; echo
+          done
       - name: Collect (universe + incremental OHLCV)
         id: collect
-        continue-on-error: true     # partial failures must not discard the symbols that did update
-        run: python -m backend.collect_data
-
-      - name: Indicators
-        run: python -m backend.calculate_indicators
-
-      - name: Breadth
-        run: python -m backend.calculate_breadth
-
-      - name: Validate data integrity
-        run: python -m backend.validate_data
-
+        run: |
+          set +e
+          python -m backend.collect_data
+          rc=$?
+          echo "rc=$rc" >> "$GITHUB_OUTPUT"
+          # 0 = ok, 1 = partial failures (keep going and commit what worked), 2+ = fatal: stop now
+          if [ "$rc" -ge 2 ]; then exit "$rc"; fi
+          exit 0
+      - run: python -m backend.calculate_indicators
+      - run: python -m backend.calculate_breadth
+      - run: python -m backend.validate_data
       - name: Commit and push (only if something changed)
         run: |
           git config user.name "github-actions[bot]"
@@ -53,9 +59,8 @@ jobs:
             git pull --rebase origin "${GITHUB_REF_NAME}" && git push origin "HEAD:${GITHUB_REF_NAME}" && break
             sleep $((i * 5))
           done
-
-      - name: Fail the run if collection had a fatal problem
-        if: steps.collect.outcome == 'failure'
+      - name: Fail the run if some symbols failed
+        if: steps.collect.outputs.rc == '1'
         run: |
-          echo "::error::collect_data exited non-zero (benchmark failed or >20% of requests failed). See data/monitor/status.json"
+          echo "::error::Partial collection failure - see data/monitor/status.json (failures) and the Collect log"
           exit 1
