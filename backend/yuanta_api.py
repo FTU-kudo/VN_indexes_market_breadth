@@ -125,6 +125,26 @@ def parse_history(payload: Any) -> list[dict]:
     return [by_date[d] for d in sorted(by_date)]
 
 
+# ---------------------------------------------------------------- edge challenge handling
+MAX_CHALLENGE_HOPS = 3
+_CHALLENGE_RE = re.compile(r"window\.location\.href\s*=\s*[\"']([^\"']+)[\"']")
+
+
+def challenge_redirect(body: str) -> str | None:
+    """If `body` is the edge's JS redirect page, return the URL to request next, else None.
+
+    Accepted only when it is an HTTPS URL on the Yuanta host carrying a jskey token.
+    """
+    if "jskey=" not in body[:2000]:
+        return None
+    m = _CHALLENGE_RE.search(body[:2000])
+    if not m:
+        return None
+    target = m.group(1).replace("\\/", "/")
+    host = C.BASE.split("://", 1)[1]
+    return target if target.startswith(f"https://{host}/") and "jskey=" in target else None
+
+
 # ---------------------------------------------------------------- client
 def make_session() -> requests.Session:
     s = requests.Session()
@@ -145,11 +165,23 @@ class YuantaClient:
         self.session = session or make_session()
         self.timeout = timeout
 
-    def _get(self, url: str, params: dict | None = None) -> Any:
+    def _fetch(self, url: str, params: dict | None = None) -> requests.Response:
         try:
-            r = self.session.get(url, params=params, timeout=self.timeout)
+            return self.session.get(url, params=params, timeout=self.timeout)
         except requests.RequestException as e:
             raise YuantaAPIError(f"GET {url} {params}: {type(e).__name__}: {e}") from e
+
+    def _get(self, url: str, params: dict | None = None) -> Any:
+        r = self._fetch(url, params)
+        # The edge in front of ysradar answers unfamiliar clients with a tiny HTML page whose script just
+        # redirects to the same URL plus a ?jskey=... token (no computation involved). A browser follows that
+        # redirect transparently; do the same, but only to the same host and at most MAX_CHALLENGE_HOPS times.
+        for _ in range(MAX_CHALLENGE_HOPS):
+            target = challenge_redirect(r.text) if r.status_code == 200 else None
+            if not target:
+                break
+            log.info("following edge challenge redirect (%s)", target.split("?")[0])
+            r = self._fetch(target)
         if r.status_code >= 400:  # keep the body: WAF / geo-block pages explain themselves
             raise YuantaAPIError(f"HTTP {r.status_code} {r.reason} for {r.url} :: {r.text[:200]!r}")
         try:
