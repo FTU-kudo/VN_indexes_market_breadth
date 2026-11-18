@@ -5,16 +5,17 @@ import pandas as pd
 from backend import config as C
 from backend.collect_data import sync_symbol
 from backend.store import load_prices
-from backend.yuanta_api import vn_midnight_epoch
+from backend.yuanta_api import history_end_epoch, vn_midnight_epoch
 
 
 class FakeClient:
     """Serves bars from an in-memory list; records requested start dates."""
     def __init__(self, bars):
-        self.bars, self.calls = bars, []
+        self.bars, self.calls, self.ends = bars, [], []
 
     def history(self, symbol, start, end_epoch=None):
         self.calls.append(start)
+        self.ends.append(end_epoch)
         return [b for b in self.bars if b["date"] >= start]
 
 
@@ -78,3 +79,10 @@ def test_storage_partitioned_by_year_and_valid_json(data_dir):
     sync_symbol(FakeClient(b), "indexes", "VNINDEX", NOW, None, False)
     files = sorted(p.name for p in (data_dir / "prices" / "indexes" / "VNINDEX").glob("*.json"))
     assert files == ["2025.json", "2026.json"]
+
+
+def test_history_end_is_beyond_the_end_of_today(data_dir):
+    fc = FakeClient(bars(5))
+    sync_symbol(fc, "stocks", "AAA", NOW, None, False)
+    assert fc.ends[0] == history_end_epoch(NOW)
+    assert fc.ends[0] >= vn_midnight_epoch(date(2026, 11, 19))   # not "now": a bar for today must not be held back
