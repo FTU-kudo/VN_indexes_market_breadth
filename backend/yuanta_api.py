@@ -12,7 +12,7 @@ import logging
 import math
 import os
 import re
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from typing import Any
 
 import requests
@@ -45,6 +45,17 @@ def ts_to_date(t: int | float) -> date:
     right date for that stamp and for a 00:00-ICT stamp, so both conventions are safe.
     """
     return datetime.fromtimestamp(int(t), tz=C.TZ).date()
+
+
+def history_end_epoch(now: datetime | None = None) -> int:
+    """`to` for the history endpoint: 00:00 ICT two days ahead, i.e. safely past the end of today.
+
+    `to=<now>` returned no bar for the current day when requested from GitHub Actions (browser requests with a
+    future `to` did return it), so servers seem to hold a daily bar back until `to` passes the end of its day.
+    Asking for the future is harmless: it only caps the range, and unfinished bars are dropped by the collector.
+    """
+    d = (now or now_vn()).astimezone(C.TZ).date()
+    return vn_midnight_epoch(d + timedelta(days=2))
 
 
 def session_is_final(now: datetime | None = None) -> bool:
@@ -198,5 +209,5 @@ class YuantaClient:
 
     def history(self, symbol: str, start: date, end_epoch: int | None = None) -> list[dict]:
         params = {"symbol": symbol, "resolution": "1D", "from": vn_midnight_epoch(start),
-                  "to": end_epoch if end_epoch is not None else int(now_vn().timestamp()), "limit": 100000}
+                  "to": end_epoch if end_epoch is not None else history_end_epoch(), "limit": 100000}
         return parse_history(self._get(C.URL_HISTORY, params))
