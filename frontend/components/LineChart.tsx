@@ -1,6 +1,6 @@
 "use client";
 import { ColorType, createChart, LineStyle } from "lightweight-charts";
-import { useEffect, useRef } from "react";
+import { ReactNode, useEffect, useRef } from "react";
 import { useTheme } from "./ThemeProvider";
 
 export type Pt = { time: string; value: number | null; color?: string };
@@ -15,8 +15,8 @@ export const chartOptions = (height: number, dark = true) => ({
 
 const NO_LINES: { value: number; color?: string }[] = [];
 
-export default function LineChart({ series, height = 260, hlines = NO_LINES, title }: {
-  series: Ser[]; height?: number; hlines?: { value: number; color?: string }[]; title?: string;
+export default function LineChart({ series, height = 260, hlines = NO_LINES, title, actions }: {
+  series: Ser[]; height?: number; hlines?: { value: number; color?: string }[]; title?: string; actions?: ReactNode;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const { theme } = useTheme();
@@ -45,6 +45,7 @@ export default function LineChart({ series, height = 260, hlines = NO_LINES, tit
             <i className="inline-block h-2 w-3 rounded-sm" style={{ background: s.color }} />{s.name}
           </span>
         ))}
+        {actions && <div className="ml-auto">{actions}</div>}
       </div>
       <div ref={ref} style={{ height }} />
     </div>
