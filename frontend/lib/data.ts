@@ -1,6 +1,10 @@
 import { useEffect, useState } from "react";
 
-export const BASE = (process.env.NEXT_PUBLIC_DATA_BASE_URL || "").replace(/\/$/, "");
+// Falls back to this repo's data folder so the dashboard works even if the env var is missing.
+export const BASE = (
+  process.env.NEXT_PUBLIC_DATA_BASE_URL ||
+  "https://raw.githubusercontent.com/FTU-kudo/VN_indexes_market_breadth/main/data"
+).replace(/\/$/, "");
 
 export type Row = { symbol: string; date: string; [k: string]: number | string | null };
 export type Status = {
