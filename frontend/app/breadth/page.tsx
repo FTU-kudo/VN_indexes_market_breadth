@@ -1,5 +1,5 @@
 "use client";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import LineChart, { Ser } from "@/components/LineChart";
 import { Loading, Page } from "@/components/Ui";
 import { Columnar, fmt, useJSON } from "@/lib/data";
@@ -11,7 +11,7 @@ const KIND_LABEL: Record<string, string> = { market: "Market", exchange: "Exchan
 
 export default function BreadthPage() {
   const list = useJSON<{ groups: Group[]; membership_basis: string }>("breadth/index.json");
-  const [gid, setGid] = useState("MARKET");
+  const [gid, setGid] = useState("HOSE"); // default group
   const [range, setRange] = useState(252);
   const [hlWin, setHlWin] = useState("52w");
   const b = useJSON<Breadth>(`breadth/${gid}.json`);
@@ -34,6 +34,10 @@ export default function BreadthPage() {
 
   const last = (k: string) => b.data?.series[k]?.[b.data.dates.length - 1] ?? null;
   const groups = list.data?.groups ?? [];
+  // if the default group is not in the data (e.g. before the first run), fall back to the whole market
+  useEffect(() => {
+    if (groups.length && !groups.some((g) => g.id === gid)) setGid(groups.find((g) => g.id === "MARKET")?.id ?? groups[0].id);
+  }, [groups, gid]);
   const lines50 = useMemo(() => [{ value: 50 }], []);
   const lines3070 = useMemo(() => [{ value: 30, color: "#f43f5e" }, { value: 70, color: "#10b981" }], []);
 
@@ -50,9 +54,6 @@ export default function BreadthPage() {
         <div className="flex gap-1">{RANGES.map(([l, n]) => (
           <button key={l} onClick={() => setRange(n)} className={`rounded px-2 py-1 ${range === n ? "bg-sky-600 text-white" : "bg-slate-800 text-slate-300"}`}>{l}</button>
         ))}</div>
-        <select value={hlWin} onChange={(e) => setHlWin(e.target.value)}>
-          <option value="20">20-day highs/lows</option><option value="50">50-day highs/lows</option><option value="52w">52-week highs/lows</option>
-        </select>
       </div>
       <p className="rounded border border-amber-300 bg-amber-50 p-2 text-xs text-amber-900 dark:border-amber-800 dark:bg-amber-950/50 dark:text-amber-200">
         Survivorship bias: {list.data?.membership_basis ?? "membership uses current constituents"}.
@@ -67,7 +68,11 @@ export default function BreadthPage() {
           <LineChart title="% of stocks above moving average" series={s.ma} hlines={lines50} />
           <div className="grid gap-4 lg:grid-cols-2">
             <LineChart title="Advance–Decline line (cumulative net advances)" series={s.ad} />
-            <LineChart title="New highs vs new lows (count)" series={s.hl} />
+            <LineChart title="New highs vs new lows (count)" series={s.hl} actions={
+              <select value={hlWin} onChange={(e) => setHlWin(e.target.value)} aria-label="Highs/lows window" className="py-0.5 text-xs">
+              <option value="20">20-day</option><option value="50">50-day</option><option value="52w">52-week</option>
+            </select>
+            } />
           </div>
           <LineChart title={`Composite breadth score (weights ${Object.entries(b.data!.composite_weights).map(([k, v]) => `${k} ${v}`).join(", ")})`} series={s.score} hlines={lines3070} height={300} />
           <LineChart title="Participation (% of stocks)" series={s.part} hlines={lines50} />
