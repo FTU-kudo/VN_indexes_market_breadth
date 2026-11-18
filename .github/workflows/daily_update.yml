@@ -26,15 +26,7 @@ jobs:
       - run: python -m pytest -q
       - name: Probe Yuanta API from this runner (diagnostic)
         continue-on-error: true
-        run: |
-          B=https://ysradar.yuanta.com.vn
-          for u in "$B/api/v3/market_data/price_board/index/list_index" \
-                   "$B/v2/tradingview/history?symbol=VNINDEX&resolution=1D&from=1577811600&to=$(date +%s)&limit=5"; do
-            echo "== $u"
-            curl -sS -m 20 -A "Mozilla/5.0" -e "$B/" -o /tmp/body -D /tmp/hdr \
-                 -w "http=%{http_code} ip=%{remote_ip} t=%{time_total}s\n" "$u" || echo "curl failed rc=$?"
-            head -n 3 /tmp/hdr; head -c 300 /tmp/body; echo
-          done
+        run: python -m backend.probe
       - name: Collect (universe + incremental OHLCV)
         id: collect
         run: |
