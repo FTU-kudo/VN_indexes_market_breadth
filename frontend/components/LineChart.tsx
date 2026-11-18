@@ -8,6 +8,7 @@ export type Ser = { name: string; color: string; data: Pt[]; kind?: "line" | "hi
 
 export const chartOptions = (height: number, dark = true) => ({
   height, autoSize: true,
+  localization: { locale: "en-US" }, // month names etc. in English regardless of the browser language
   layout: { background: { type: ColorType.Solid, color: "rgba(0,0,0,0)" }, textColor: dark ? "#949caa" : "#5b6578" },
   grid: { vertLines: { color: dark ? "#242934" : "#e9ecf2" }, horzLines: { color: dark ? "#242934" : "#e9ecf2" } },
   rightPriceScale: { borderColor: dark ? "#333a47" : "#d6dbe3" }, timeScale: { borderColor: dark ? "#333a47" : "#d6dbe3" },
