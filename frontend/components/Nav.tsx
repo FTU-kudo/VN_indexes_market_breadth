@@ -1,6 +1,7 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import Clock from "./Clock";
 import ThemeToggle from "./ThemeToggle";
 
 const items = [["/", "Overview"], ["/breadth", "Market breadth"], ["/screener", "Screener"], ["/stock/VIC", "Stock analysis"], ["/monitor", "Data monitor"]];
@@ -16,7 +17,7 @@ export default function Nav() {
           <Link key={href} href={href} className={`rounded-md px-3 py-1 text-sm ${active ? "bg-slate-800 text-slate-100" : "text-slate-400 hover:text-slate-100"}`}>{label}</Link>
         );
       })}
-      <ThemeToggle />
+      <div className="ml-auto flex items-center gap-3"><Clock /><ThemeToggle /></div>
     </nav>
   );
 }
