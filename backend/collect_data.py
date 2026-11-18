@@ -30,7 +30,7 @@ import pandas as pd
 
 from . import config as C
 from .store import load_prices, read_json, save_prices, update_status, utc_now_iso, write_if_changed
-from .yuanta_api import YuantaAPIError, YuantaClient, now_vn, session_is_final
+from .yuanta_api import YuantaAPIError, YuantaClient, history_end_epoch, now_vn, session_is_final
 
 log = logging.getLogger("collect")
 
@@ -75,7 +75,7 @@ def sync_symbol(client: YuantaClient, kind: str, symbol: str, now: datetime,
         start = C.START_DATE
         if have and not full:
             start = max(C.START_DATE, existing.index[-1].date() - timedelta(days=C.OVERLAP_DAYS))
-        end_epoch = int(now.timestamp())
+        end_epoch = history_end_epoch(now)
         final = session_is_final(now)
 
         def fetch(s: date) -> pd.DataFrame:
@@ -211,6 +211,7 @@ def main(argv: list[str] | None = None) -> int:
             failures.append({"symbol": r.symbol, "kind": "indexes", "error": r.error})
     bench = load_prices("indexes", C.BENCHMARK)
     latest = bench.index[-1].date() if not bench.empty else None
+    log.info("benchmark %s: %s (%d new bars)", C.BENCHMARK, bench_res.status if bench_res else "skipped", bench_res.new_bars if bench_res else 0)
     log.info("latest trading session (VNINDEX): %s", latest)
 
     # 2) everything else
