@@ -1,0 +1,8 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body { @apply bg-slate-950 text-slate-200 antialiased; }
+th { @apply text-left font-medium text-slate-400 whitespace-nowrap; }
+td, th { @apply px-2 py-1; }
+input, select { @apply bg-slate-900 border border-slate-700 rounded px-2 py-1 text-sm; }
