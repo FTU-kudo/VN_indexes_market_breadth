@@ -92,7 +92,7 @@ export default function StockPage() {
       {row && (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {GROUPS.map(([title, test]) => (
-            <div key={title} className="rounded border border-slate-800 bg-slate-900 p-2">
+            <div key={title} className="rounded-xl border border-slate-800 bg-slate-900 p-2">
               <h3 className="mb-1 text-sm font-semibold text-slate-300">{title}</h3>
               <table className="w-full text-xs"><tbody>
                 {Object.keys(row).filter(test).map((k) => (

@@ -54,14 +54,14 @@ export default function BreadthPage() {
           <option value="20">20-day highs/lows</option><option value="50">50-day highs/lows</option><option value="52w">52-week highs/lows</option>
         </select>
       </div>
-      <p className="rounded border border-amber-800 bg-amber-950/50 p-2 text-xs text-amber-200">
+      <p className="rounded border border-amber-300 bg-amber-50 p-2 text-xs text-amber-900 dark:border-amber-800 dark:bg-amber-950/50 dark:text-amber-200">
         Survivorship bias: {list.data?.membership_basis ?? "membership uses current constituents"}.
       </p>
       {b.loading || !s ? <Loading what="breadth" /> : (
         <>
           <div className="grid grid-cols-2 gap-2 text-sm md:grid-cols-5">
             {[["Composite", last("composite"), 1], ["% > MA50", last("above_50_pct"), 1], ["% > MA200", last("above_200_pct"), 1], ["Advancing", last("adv"), 0], ["Declining", last("dec"), 0]].map(([l, v, d]) => (
-              <div key={l as string} className="rounded border border-slate-800 bg-slate-900 p-2"><div className="text-xs text-slate-400">{l as string}</div><div className="text-lg font-semibold">{fmt(v as number | null, d as number)}</div></div>
+              <div key={l as string} className="rounded-xl border border-slate-800 bg-slate-900 p-2"><div className="text-xs text-slate-400">{l as string}</div><div className="text-lg font-semibold">{fmt(v as number | null, d as number)}</div></div>
             ))}
           </div>
           <LineChart title="% of stocks above moving average" series={s.ma} hlines={lines50} />

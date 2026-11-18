@@ -2,7 +2,21 @@
 @tailwind components;
 @tailwind utilities;
 
-body { @apply bg-slate-950 text-slate-200 antialiased; }
+/* Light theme (default values); the .dark block below is the charcoal dark theme. */
+:root {
+  --slate-50: 15 18 24;   --slate-100: 22 26 34;   --slate-200: 38 43 54;   --slate-300: 71 79 94;
+  --slate-400: 100 108 124; --slate-500: 120 128 144; --slate-600: 170 178 192; --slate-700: 214 219 227;
+  --slate-800: 228 232 238; --slate-900: 255 255 255; --slate-950: 246 247 250;
+  color-scheme: light;
+}
+.dark {
+  --slate-50: 248 249 251; --slate-100: 238 241 245; --slate-200: 222 226 233; --slate-300: 190 196 207;
+  --slate-400: 148 156 170; --slate-500: 110 118 134; --slate-600: 71 79 94;   --slate-700: 51 58 71;
+  --slate-800: 36 41 52;   --slate-900: 24 28 37;    --slate-950: 16 19 26;
+  color-scheme: dark;
+}
+
+body { @apply bg-slate-950 text-slate-200 antialiased transition-colors; }
 th { @apply text-left font-medium text-slate-400 whitespace-nowrap; }
 td, th { @apply px-2 py-1; }
 input, select { @apply bg-slate-900 border border-slate-700 rounded px-2 py-1 text-sm; }

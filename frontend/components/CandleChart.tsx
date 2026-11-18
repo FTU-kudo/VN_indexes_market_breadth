@@ -2,14 +2,16 @@
 import { createChart } from "lightweight-charts";
 import { useEffect, useRef } from "react";
 import { chartOptions, Ser } from "./LineChart";
+import { useTheme } from "./ThemeProvider";
 
 export type Candle = { time: string; open: number; high: number; low: number; close: number; volume: number };
 
 export default function CandleChart({ candles, overlays, height = 420 }: { candles: Candle[]; overlays: Ser[]; height?: number }) {
   const ref = useRef<HTMLDivElement>(null);
+  const { theme } = useTheme();
   useEffect(() => {
     if (!ref.current) return;
-    const chart = createChart(ref.current, chartOptions(height));
+    const chart = createChart(ref.current, chartOptions(height, theme === "dark"));
     const cs = chart.addCandlestickSeries({ upColor: "#10b981", downColor: "#f43f5e", wickUpColor: "#10b981", wickDownColor: "#f43f5e", borderVisible: false });
     cs.setData(candles.map(({ time, open, high, low, close }) => ({ time, open, high, low, close })));
     const vol = chart.addHistogramSeries({ priceFormat: { type: "volume" }, priceScaleId: "vol" });
@@ -21,9 +23,9 @@ export default function CandleChart({ candles, overlays, height = 420 }: { candl
     });
     chart.timeScale().fitContent();
     return () => chart.remove();
-  }, [candles, overlays, height]);
+  }, [candles, overlays, height, theme]);
   return (
-    <div className="rounded border border-slate-800 bg-slate-900 p-2">
+    <div className="rounded-xl border border-slate-800 bg-slate-900 p-2">
       <div className="mb-1 flex flex-wrap gap-3 text-xs text-slate-400">
         {overlays.map((s) => (
           <span key={s.name} className="flex items-center gap-1"><i className="inline-block h-2 w-3 rounded-sm" style={{ background: s.color }} />{s.name}</span>

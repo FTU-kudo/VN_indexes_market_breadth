@@ -77,7 +77,7 @@ export default function Screener() {
       {snap.loading ? <Loading what="snapshot" /> : (
         <>
           <p className="text-sm text-slate-400">{rows.length} of {merged.length} stocks (showing first 300). Prices are in the unit returned by Yuanta history (thousand VND for equities).</p>
-          <div className="overflow-x-auto rounded border border-slate-800">
+          <div className="overflow-x-auto rounded-xl border border-slate-800">
             <table className="w-full text-sm">
               <thead className="bg-slate-900"><tr>
                 {head("symbol", "Symbol")}<th>Exch</th>{head("close", "Close")}{head("ret_1", "Chg %")}{head("vol_ratio_20", "Vol ratio")}{head("rsi_14", "RSI14")}{head("macd_hist", "MACD hist")}{head("dist50", "vs SMA50 %")}{head("rs_20", "RS20")}<th>Date</th>
@@ -85,7 +85,7 @@ export default function Screener() {
               <tbody>
                 {rows.slice(0, 300).map(({ r, info: i, dist50 }) => (
                   <tr key={r.symbol} className="border-t border-slate-800 hover:bg-slate-900">
-                    <td><Link href={`/stock/${r.symbol}`} className="font-medium text-sky-300">{r.symbol}</Link></td>
+                    <td><Link href={`/stock/${r.symbol}`} className="font-medium text-sky-600 dark:text-sky-300">{r.symbol}</Link></td>
                     <td className="text-slate-400">{i?.exchange ?? "–"}</td>
                     <td>{fmt(num(r, "close"))}</td>
                     <td className={tone(num(r, "ret_1"))}>{fmt(num(r, "ret_1"))}</td>

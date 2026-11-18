@@ -52,4 +52,4 @@ export const num = (r: Row | undefined | null, k: string): number | null => {
 export const fmt = (v: number | null | undefined, d = 2) =>
   v === null || v === undefined ? "–" : v.toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d });
 export const tone = (v: number | null | undefined) =>
-  v === null || v === undefined || v === 0 ? "" : v > 0 ? "text-emerald-400" : "text-rose-400";
+  v === null || v === undefined || v === 0 ? "" : v > 0 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400";
