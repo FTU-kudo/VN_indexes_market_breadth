@@ -5,7 +5,7 @@ import logging
 import sys
 from datetime import date, timedelta
 
-from .yuanta_api import YuantaClient, now_vn
+from .yuanta_api import YuantaClient, history_end_epoch, now_vn
 
 
 def main() -> int:
@@ -18,6 +18,8 @@ def main() -> int:
         ("list_stock_info UPCOM", lambda: f"{len(c.list_stocks(exchange='UPCOM'))} stocks"),
         ("list_stock_info index_code=VN100", lambda: f"{len(c.list_stocks(index_code='VN100'))} stocks"),
         ("history VNINDEX", lambda: (lambda b: f"{len(b)} bars, last: {b[-1] if b else None}")(c.history("VNINDEX", now_vn().date() - timedelta(days=30)))),
+        ("history VNINDEX, to=now", lambda: (lambda b: f"last bar {b[-1]['date'] if b else None}")(c.history("VNINDEX", now_vn().date() - timedelta(days=10), int(now_vn().timestamp())))),
+        ("history VNINDEX, to=future", lambda: (lambda b: f"last bar {b[-1]['date'] if b else None}")(c.history("VNINDEX", now_vn().date() - timedelta(days=10), history_end_epoch()))),
         ("history VIC", lambda: (lambda b: f"{len(b)} bars, last: {b[-1] if b else None}")(c.history("VIC", date(2020, 1, 1)))),
     ]
     for name, fn in steps:
