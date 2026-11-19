@@ -45,3 +45,20 @@ MIN_GROUP_SIZE = 5                # groups with fewer members that have prices a
 COMPOSITE_WEIGHTS = {"ma": 0.35, "ad": 0.20, "hl": 0.15, "macd": 0.15, "rsi": 0.15}
 
 SAFE_NAME = r"^[A-Za-z0-9_.\-]{1,32}$"
+
+# ---- Valuation (P/E, P/B) ----
+PRICE_UNIT_VND = 1000.0           # Yuanta history prices look like thousand VND (VIC 51.06); verify before trusting
+VALUATION_SHARES_MODE = "latest"  # "latest": adjusted prices x latest share count; "pit": raw prices x share count at filing
+MAX_FILING_AGE_DAYS = 400         # a filing older than this no longer feeds valuation (company stopped reporting)
+STALE_FILING_DAYS = 150           # snapshot flag: latest filing is older than a normal quarterly cycle
+
+# ---- Fundamentals (Yuanta -> Vietstock financial statements) ----
+URL_FIN_REPORT = "https://ysradarapi.yuanta.com.vn/api/v3/vietstock/financial_statement/report"
+FUND_REPORTS = ["KQKD", "CDKT"]   # income statement + balance sheet (CSTC ratios / LCTT cash flow are not needed for P/E, P/B)
+FUND_FLOOR_YEAR = 2019            # history floor; 2019 so TTM earnings exist from the first 2020 trading day
+FUND_MAX_BATCHES = 14             # each request returns 5 quarters -> up to 70 quarters
+FUND_UNIT = 1_000_000             # request unit: statement values come back in VND million
+FUND_CUMULATIVE = False           # True if quarterly figures turn out to be year-to-date (see discover_fields)
+PAR_VALUE_VND = 10_000            # shares outstanding ~= contributed capital / par value
+PUBLISH_LAG_DAYS = {1: 30, 2: 45, 3: 30, 4: 90}   # assumed filing deadline after quarter end (API gives no filing date)
+FUND_RECHECK_DAYS = 3             # do not re-request a symbol that is still missing the expected quarter more often than this
