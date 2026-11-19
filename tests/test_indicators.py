@@ -88,3 +88,11 @@ def test_missing_values_are_not_fabricated():
     ind = I.compute_indicators(make_ohlcv(60))
     assert ind["sma_200"].isna().all() and ind["sma_50"].iloc[:49].isna().all()
     assert ind["ichi_senkou_b"].isna().all()   # needs 52+26 bars
+
+
+def test_point_change_matches_close_minus_previous_close():
+    df = pd.DataFrame({"o": [1703.01, 1700.0], "h": [1710.0, 1702.16], "l": [1690.0, 1683.43], "c": [1703.01, 1689.62], "v": [1.0, 2.0]},
+                      index=pd.bdate_range("2026-11-18", periods=2))
+    ind = I.compute_indicators(df)
+    assert np.isnan(ind["chg_1"].iloc[0])                                   # first bar has no previous close
+    assert round(ind["chg_1"].iloc[1], 2) == -13.39 and round(ind["ret_1"].iloc[1], 2) == -0.79   # the FireAnt example
