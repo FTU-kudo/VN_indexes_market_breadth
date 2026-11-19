@@ -138,6 +138,7 @@ def parse_history(payload: Any) -> list[dict]:
 
 # ---------------------------------------------------------------- edge challenge handling
 MAX_CHALLENGE_HOPS = 3
+ALLOWED_HOSTS = ("ysradar.yuanta.com.vn", "ysradarapi.yuanta.com.vn")
 _CHALLENGE_RE = re.compile(r"window\.location\.href\s*=\s*[\"']([^\"']+)[\"']")
 
 
@@ -152,8 +153,8 @@ def challenge_redirect(body: str) -> str | None:
     if not m:
         return None
     target = m.group(1).replace("\\/", "/")
-    host = C.BASE.split("://", 1)[1]
-    return target if target.startswith(f"https://{host}/") and "jskey=" in target else None
+    ok = any(target.startswith(f"https://{h}/") for h in ALLOWED_HOSTS)
+    return target if ok and "jskey=" in target else None
 
 
 # ---------------------------------------------------------------- client
