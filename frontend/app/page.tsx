@@ -11,7 +11,7 @@ import { Columnar, fmt, num, Row, Status, useJSON } from "@/lib/data";
    "Main" = headline benchmark indices (edit this list to match the codes Yuanta returns);
    everything else is shown under "Sector indices". */
 const MAIN_ORDER = ["VNINDEX", "VN30", "VN100", "VNMID", "VNSML", "VNALL", "VNXALL", "VNX50", "HNXINDEX", "HNX30", "UPCOMINDEX"];
-const KPI_CODES = ["VNINDEX", "VN30", "HNXINDEX"];
+const KPI_CODES = ["VNINDEX", "VN30", "HNXINDEX", "UPCOMINDEX"];   // all markets: HOSE, HOSE large caps, HNX, UPCOM
 const rank = (s: string) => { const i = MAIN_ORDER.indexOf(s); return i < 0 ? 99 : i; };
 type Cat = "all" | "main" | "sector";
 const SMAS = ["sma_10", "sma_20", "sma_50", "sma_200"] as const;
@@ -19,6 +19,16 @@ const SMAS = ["sma_10", "sma_20", "sma_50", "sma_200"] as const;
 const compact = new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 2 });
 const dist = (r: Row, k: string) => { const c = num(r, "close"), m = num(r, k); return c !== null && m ? (c / m - 1) * 100 : null; };
 const up_ = "text-emerald-600 dark:text-emerald-400", dn_ = "text-rose-600 dark:text-rose-400";
+
+/** Signed number with a real minus sign, e.g. −13.39 / +0.30. */
+const sgn = (v: number, d = 2) => `${v > 0 ? "+" : v < 0 ? "−" : ""}${Math.abs(v).toFixed(d)}`;
+/** Points gained/lost vs the previous close (chg_1); derived from close and % change for data written before chg_1 existed. */
+const chgPts = (r: Row): number | null => {
+  const a = num(r, "chg_1");
+  if (a !== null) return a;
+  const c = num(r, "close"), p = num(r, "ret_1");
+  return c !== null && p !== null ? c - c / (1 + p / 100) : null;
+};
 
 /* ------------------------------------------------------------------ cell renderers */
 function ChgPill({ v }: { v: number | null }) {
@@ -30,6 +40,23 @@ function ChgPill({ v }: { v: number | null }) {
       <Icon className="h-3.5 w-3.5" aria-hidden />{Math.abs(v).toFixed(2)}%
     </span>
   );
+}
+
+/** "−13.39 / −0.79%" : exact points and percent move vs the previous close. */
+function ChgText({ r, className = "" }: { r: Row; className?: string }) {
+  const pts = chgPts(r), pct = num(r, "ret_1");
+  if (pts === null || pct === null) return <span className="text-slate-500">–</span>;
+  const [cls, Icon] = pts > 0 ? [up_, ArrowUpRight] : pts < 0 ? [dn_, ArrowDownRight] : ["text-slate-400", Minus];
+  return (
+    <span className={`inline-flex items-center gap-1 font-semibold tabular-nums ${cls} ${className}`} title="Change vs previous close (points / %)">
+      <Icon className="h-4 w-4" aria-hidden />{sgn(pts)} / {sgn(pct)}%
+    </span>
+  );
+}
+
+function PtsCell({ v }: { v: number | null }) {
+  if (v === null) return <span className="text-slate-500">–</span>;
+  return <span className={`font-medium ${v > 0 ? up_ : v < 0 ? dn_ : "text-slate-400"}`}>{sgn(v)}</span>;
 }
 
 function SmaCell({ r, k }: { r: Row; k: string }) {
@@ -91,6 +118,7 @@ type Col = { key: string; label: string; center?: boolean; get: (r: Row) => numb
 const COLS: Col[] = [
   { key: "close", label: "Close", get: (r) => num(r, "close"), cell: (r) => <span className="font-medium text-slate-100">{fmt(num(r, "close"))}</span> },
   { key: "chg", label: "Chg %", get: (r) => num(r, "ret_1"), cell: (r) => <ChgPill v={num(r, "ret_1")} /> },
+  { key: "pts", label: "Chg (pts)", get: chgPts, cell: (r) => <PtsCell v={chgPts(r)} /> },
   { key: "vol", label: "Volume", get: (r) => num(r, "volume"), cell: (r, m) => <VolCell v={num(r, "volume")} max={m} /> },
   { key: "trend", label: "Trend", center: true, get: trendCount, cell: (r) => <TrendCell r={r} /> },
   ...SMAS.map((k): Col => ({ key: k, label: k.replace("_", " ").toUpperCase(), get: (r) => dist(r, k), cell: (r) => <SmaCell r={r} k={k} /> })),
@@ -110,10 +138,12 @@ function KpiCard({ row, name, onPick }: { row: Row; name: string; onPick: () => 
           <div className="text-xs font-medium uppercase tracking-wide text-slate-400">{row.symbol}</div>
           {name !== row.symbol && <div className="text-xs text-slate-500">{name}</div>}
         </div>
-        <ChgPill v={num(row, "ret_1")} />
       </div>
       <div className="mt-2 flex items-end justify-between gap-3">
-        <div className="text-2xl font-semibold tabular-nums text-slate-100">{fmt(num(row, "close"))}</div>
+        <div>
+          <div className="text-2xl font-semibold tabular-nums text-slate-100">{fmt(num(row, "close"))}</div>
+          <ChgText r={row} className="mt-0.5 text-sm" />
+        </div>
         <div className="w-28 shrink-0">
           {hist.loading ? <div className="h-9 animate-pulse rounded bg-slate-800" /> : <Sparkline values={vals} up={up} className="h-9 w-full" />}
           <div className="text-right text-[10px] text-slate-500">last {vals.length || 60} sessions</div>
@@ -152,7 +182,7 @@ export default function Overview() {
   const all = useMemo(() => [...(snap.data?.rows ?? [])].sort((a, b) => rank(a.symbol) - rank(b.symbol) || a.symbol.localeCompare(b.symbol)), [snap.data]);
   const kpis = useMemo(() => {
     const picked = KPI_CODES.map((c) => all.find((r) => r.symbol === c)).filter((r): r is Row => !!r);
-    return [...picked, ...all.filter((r) => !picked.includes(r))].slice(0, 3);
+    return [...picked, ...all.filter((r) => !picked.includes(r))].slice(0, 4);
   }, [all]);
 
   const rows = useMemo(() => {
@@ -181,7 +211,7 @@ export default function Overview() {
 
   const Mover = ({ r }: { r: Row }) => (
     <button onClick={() => setSel(r.symbol)} className="inline-flex items-center gap-1.5 rounded-full border border-slate-800 bg-slate-900 px-2.5 py-1 text-xs hover:border-slate-700">
-      <span className="font-medium text-slate-200">{r.symbol}</span><ChgPill v={num(r, "ret_1")} />
+      <span className="font-medium text-slate-200">{r.symbol}</span><ChgText r={r} className="text-xs" />
     </button>
   );
 
@@ -192,8 +222,8 @@ export default function Overview() {
       </p>
 
       {/* KPI bar */}
-      <section aria-label="Key indices" className="grid gap-3 md:grid-cols-3">
-        {snap.loading ? [0, 1, 2].map((i) => <div key={i} className="h-[108px] animate-pulse rounded-xl border border-slate-800 bg-slate-900" />)
+      <section aria-label="Key indices" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        {snap.loading ? [0, 1, 2, 3].map((i) => <div key={i} className="h-[108px] animate-pulse rounded-xl border border-slate-800 bg-slate-900" />)
           : kpis.map((r) => <KpiCard key={r.symbol} row={r} name={nameOf.get(r.symbol) ?? r.symbol} onPick={() => setSel(r.symbol)} />)}
       </section>
 
