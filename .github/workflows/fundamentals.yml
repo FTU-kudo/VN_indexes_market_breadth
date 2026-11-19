@@ -1,0 +1,78 @@
+name: Fundamentals update
+
+on:
+  # schedule:
+  #   - cron: "0 12 * * 1-5"      # 19:00 Vietnam time, Mon-Fri; most runs find nothing new and commit nothing
+  workflow_dispatch:
+    inputs:
+      full:
+        description: "Re-download full statement history (use for the first run)"
+        type: boolean
+        default: false
+      symbols:
+        description: "Optional comma-separated subset, e.g. ANV,VCB (empty = all stocks)"
+        type: string
+        default: ""
+      limit:
+        description: "Trial run: only the first N stocks (0 = all)"
+        type: string
+        default: "0"
+
+concurrency:
+  group: market-data-update      # same group as the price workflows: one writer at a time
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  fundamentals:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - run: python -m pytest -q
+
+      - name: Collect financial statements
+        id: collect
+        env:
+          FULL: ${{ inputs.full }}
+          SYMBOLS: ${{ inputs.symbols }}
+          LIMIT: ${{ inputs.limit }}
+        run: |
+          ARGS=""
+          [ "$FULL" = "true" ] && ARGS="$ARGS --full"
+          [ -n "$SYMBOLS" ] && ARGS="$ARGS --symbols $SYMBOLS"
+          [ -n "$LIMIT" ] && [ "$LIMIT" != "0" ] && ARGS="$ARGS --limit $LIMIT"
+          set +e
+          python -m backend.collect_fundamentals $ARGS
+          rc=$?
+          echo "rc=$rc" >> "$GITHUB_OUTPUT"
+          # 0 = ok, 1 = partial failures (keep going and commit what worked), 2+ = nothing usable: stop
+          if [ "$rc" -ge 2 ]; then exit "$rc"; fi
+          exit 0
+
+      - run: python -m backend.calculate_valuation
+
+      - name: Commit and push (only if something changed)
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A data
+          if git diff --cached --quiet; then echo "No changes - nothing to commit"; exit 0; fi
+          git commit -m "data: fundamentals + valuation $(date -u +%F)"
+          for i in 1 2 3; do
+            git pull --rebase origin "${GITHUB_REF_NAME}" && git push origin "HEAD:${GITHUB_REF_NAME}" && break
+            sleep $((i * 5))
+          done
+
+      - name: Fail if some stocks failed
+        if: steps.collect.outputs.rc == '1'
+        run: |
+          echo "::error::Partial failure - see data/monitor/status.json (fundamentals.failed_list)"
+          exit 1
