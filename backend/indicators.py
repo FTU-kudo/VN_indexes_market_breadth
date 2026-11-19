@@ -144,7 +144,7 @@ def mfi(h, l, c, v, n=14) -> pd.Series:
 def compute_indicators(df: pd.DataFrame, bench_close: pd.Series | None = None) -> pd.DataFrame:
     """All indicators for one symbol; same index as df. `bench_close` enables relative strength."""
     o, h, l, c, v = (df[k].astype("float64") for k in "ohlcv")
-    X: dict[str, pd.Series | np.ndarray] = {"close": c, "volume": v, "ret_1": c.pct_change() * 100}
+    X: dict[str, pd.Series | np.ndarray] = {"close": c, "volume": v, "chg_1": c.diff(), "ret_1": c.pct_change() * 100}
 
     for n in MA_PERIODS:
         X[f"sma_{n}"], X[f"ema_{n}"] = sma(c, n), ema(c, n)
