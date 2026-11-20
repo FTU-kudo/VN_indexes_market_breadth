@@ -4,7 +4,7 @@ import { usePathname } from "next/navigation";
 import Clock from "./Clock";
 import ThemeToggle from "./ThemeToggle";
 
-const items = [["/", "Overview"], ["/breadth", "Market breadth"], ["/screener", "Screener"], ["/stock/VIC", "Stock analysis"], ["/monitor", "Data monitor"]];
+const items = [["/", "Overview"], ["/breadth", "Market breadth"], ["/valuation", "Valuation"], ["/fundamental/VIC", "Fundamentals"], ["/valuation", "Valuation"], ["/screener", "Screener"], ["/stock/VIC", "Stock analysis"], ["/monitor", "Data monitor"]];
 
 export default function Nav() {
   const p = usePathname();
