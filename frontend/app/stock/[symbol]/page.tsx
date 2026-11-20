@@ -1,10 +1,12 @@
 "use client";
+import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import CandleChart, { Candle } from "@/components/CandleChart";
 import LineChart, { Pt, Ser } from "@/components/LineChart";
 import { Loading, Page } from "@/components/Ui";
-import { fmt, getJSON, num, PriceYear, Row, useJSON } from "@/lib/data";
+import { fmt, num, PriceYear, Row, tone, useJSON } from "@/lib/data";
+import { loadPrices } from "@/lib/prices";
 import { bollinger, macd, N, rsi, sma } from "@/lib/ta";
 
 const RANGES: [string, number][] = [["3M", 63], ["6M", 126], ["1Y", 252], ["3Y", 756], ["All", 1e9]];
@@ -17,19 +19,6 @@ const GROUPS: [string, (k: string) => boolean][] = [
   ["Performance & relative strength", (k) => /^(perf|rs_|ret_)/.test(k)],
 ];
 
-async function loadPrices(sym: string): Promise<{ bars: PriceYear; kind: string } | null> {
-  for (const kind of ["stocks", "indexes"]) {
-    const years = Array.from({ length: new Date().getFullYear() - 2019 }, (_, i) => 2020 + i);
-    const parts = (await Promise.all(years.map((y) => getJSON<PriceYear>(`prices/${kind}/${sym}/${y}.json`)))).filter(Boolean) as PriceYear[];
-    if (parts.length) {
-      const bars: PriceYear = { d: [], o: [], h: [], l: [], c: [], v: [] };
-      parts.forEach((p) => (["d", "o", "h", "l", "c", "v"] as const).forEach((k) => (bars[k] as unknown[]).push(...p[k])));
-      return { bars, kind };
-    }
-  }
-  return null;
-}
-
 export default function StockPage() {
   const { symbol } = useParams<{ symbol: string }>();
   const sym = decodeURIComponent(symbol).toUpperCase();
@@ -40,6 +29,7 @@ export default function StockPage() {
   const [loading, setLoading] = useState(true);
   const snap = useJSON<{ rows: Row[] }>("indicators/snapshot_stocks.json");
   const snapIdx = useJSON<{ rows: Row[] }>("indicators/snapshot_indexes.json");
+  const valn = useJSON<{ rows: { symbol: string; pe: number | null; pb: number | null; group: string }[] }>("valuation/snapshot.json");
 
   useEffect(() => {
     let live = true;
@@ -49,6 +39,15 @@ export default function StockPage() {
   }, [sym]);
 
   const row = useMemo(() => (snap.data?.rows.find((r) => r.symbol === sym) ?? snapIdx.data?.rows.find((r) => r.symbol === sym)), [snap.data, snapIdx.data, sym]);
+
+  const vrow = useMemo(() => valn.data?.rows.find((r) => r.symbol === sym), [valn.data, sym]);
+  const bar = useMemo(() => {
+    if (!px) return null;
+    const b = px.bars, i = b.d.length - 1;
+    if (i < 0) return null;
+    const prev = i > 0 ? b.c[i - 1] : null;
+    return { date: b.d[i], o: b.o[i], h: b.h[i], l: b.l[i], c: b.c[i], v: b.v[i], chg: prev ? b.c[i] - prev : null, pct: prev ? (b.c[i] / prev - 1) * 100 : null };
+  }, [px]);
 
   const v = useMemo(() => {
     if (!px) return null;
@@ -78,8 +77,21 @@ export default function StockPage() {
         {RANGES.map(([l, n]) => (
           <button type="button" key={l} onClick={() => setRange(n)} className={`rounded px-2 py-1 ${range === n ? "bg-sky-600 text-white" : "bg-slate-800 text-slate-300"}`}>{l}</button>
         ))}
-        {row && <span className="text-slate-400">Last bar {row.date} · close {fmt(num(row, "close"))}</span>}
       </form>
+      {bar && (
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+          <span className="text-slate-400">Latest bar <b className="text-slate-200">{bar.date}</b></span>
+          {([["O", bar.o], ["H", bar.h], ["L", bar.l], ["C", bar.c]] as [string, number][]).map(([k, x]) => (
+            <span key={k} className="text-slate-400">{k} <b className="tabular-nums text-slate-100">{fmt(x, 2)}</b></span>
+          ))}
+          {bar.chg !== null && bar.pct !== null && (
+            <span className={`font-semibold tabular-nums ${tone(bar.chg)}`}>{bar.chg > 0 ? "+" : bar.chg < 0 ? "−" : ""}{Math.abs(bar.chg).toFixed(2)} / {bar.pct > 0 ? "+" : bar.pct < 0 ? "−" : ""}{Math.abs(bar.pct).toFixed(2)}%</span>
+          )}
+          <span className="text-slate-400">Vol <b className="tabular-nums text-slate-100">{new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 2 }).format(bar.v)}</b></span>
+          {vrow && <span className="text-slate-400">P/E <b className="tabular-nums text-slate-100">{fmt(vrow.pe)}</b> · P/B <b className="tabular-nums text-slate-100">{fmt(vrow.pb)}</b></span>}
+          <Link href={`/fundamental/${sym}`} className="font-medium text-sky-600 hover:underline dark:text-sky-300">Fundamental analysis →</Link>
+        </div>
+      )}
       {loading ? <Loading what={sym} /> : !v ? <p className="text-sm text-slate-400">No stored prices for {sym}.</p> : (
         <>
           <CandleChart candles={v.candles} overlays={v.overlays} />
@@ -103,7 +115,6 @@ export default function StockPage() {
           ))}
         </div>
       )}
-      <p className="text-xs text-slate-500">Chart overlays are computed in the browser from stored OHLCV; the table shows the Python-computed snapshot (latest bar). Prices are as returned by Yuanta history.</p>
     </Page>
   );
 }
