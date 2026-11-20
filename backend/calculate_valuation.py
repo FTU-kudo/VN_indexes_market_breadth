@@ -1,43 +1,27 @@
-"""Daily P/E and P/B for every stock and group, from stored prices + data/fundamentals/*.json.
+"""Daily P/E and P/B for every stock, scope (market / exchange / index) and group, from prices + data/fundamentals/*.json.
 
 Outputs
-  data/valuation/snapshot.json   latest valuation per stock
-  data/valuation/<GROUP>.json    daily history per group (whole market, exchanges, indexes, optional sectors)
-  data/valuation/index.json      list of groups + method notes
-Does nothing (exit 0) until fundamentals files exist. Optional sector mapping: data/reference/sectors.csv (symbol,sector).
+  data/valuation/snapshot.json   latest valuation per stock, with exchange / sector / industry / group
+  data/valuation/<SCOPE>.json    per scope (MARKET, HOSE, HNX, UPCOM, every index): whole-scope statistics plus `parts`,
+                                 the per-group additive components behind the "exclude groups" view
+  data/valuation/index.json      list of scopes + method notes
+Does nothing (exit 0) until fundamentals files exist. Optional classification file: data/reference/sectors.csv.
 """
 from __future__ import annotations
 
-import csv
 import logging
-import re
 import sys
 
 import pandas as pd
 
 from . import config as C
 from .calculate_breadth import build_groups
+from .classification import load_classification
 from .store import load_prices, read_json, series_list, write_if_changed
-from .valuation import aggregate_group, prepare_fundamentals, valuation_for_symbol
+from .valuation import aggregate_group, partition_components, prepare_fundamentals, valuation_for_symbol
 
 log = logging.getLogger("valuation")
-
-
-def sector_groups(stocks: list[dict]) -> list[dict]:
-    path = C.DATA / "reference" / "sectors.csv"
-    if not path.exists():
-        return []
-    by: dict[str, list[str]] = {}
-    with path.open(encoding="utf-8-sig") as fh:
-        for r in csv.DictReader(fh):
-            sym, sec = (r.get("symbol") or "").strip().upper(), (r.get("sector") or "").strip()
-            if sym and sec:
-                by.setdefault(sec, []).append(sym)
-    out = []
-    for sec, members in sorted(by.items()):
-        gid = "SECTOR_" + re.sub(r"[^A-Za-z0-9]+", "_", sec).strip("_")[:24]
-        out.append({"id": gid, "label": sec, "kind": "sector", "members": members})
-    return out
+PART_DECIMALS = {"n_pe": 0, "n_pb": 0, "mcap_pe": 3, "ni": 3, "mcap_pb": 3, "eq": 3, "med_pe": 2, "med_pb": 2}
 
 
 def main() -> int:
@@ -55,6 +39,8 @@ def main() -> int:
         log.error("no %s prices", C.BENCHMARK)
         return 1
     master = bench.index
+    cls = load_classification().set_index("symbol")
+    group_of = cls["group"].to_dict()
 
     frames: dict[str, pd.DataFrame] = {}
     snap = []
@@ -72,7 +58,11 @@ def main() -> int:
             continue
         frames[sym] = v
         last = v.dropna(subset=["price"]).iloc[-1]
-        snap.append({"symbol": sym, "date": v.index[-1].strftime("%Y-%m-%d"), "price": last["price"], "mcap": last["mcap"],
+        c = cls.loc[sym] if sym in cls.index else None
+        snap.append({"symbol": sym, "date": v.index[-1].strftime("%Y-%m-%d"),
+                     "exchange": None if c is None else c["exchange"], "sector": C.UNCLASSIFIED if c is None else c["sector"],
+                     "industry": "" if c is None else c["industry"], "group": C.UNCLASSIFIED if c is None else c["group"],
+                     "close_vnd": last["price"] * C.PRICE_UNIT_VND, "price": last["price"], "mcap": last["mcap"],
                      "pe": last["pe"], "pb": last["pb"], "ni_ttm": last["ni_ttm"], "equity": last["equity"],
                      "loss": None if pd.isna(last["loss"]) else bool(last["loss"]),
                      "filing_age_days": None if pd.isna(last["age_days"]) else int(last["age_days"]),
@@ -82,14 +72,15 @@ def main() -> int:
         return 0
     M = {k: pd.DataFrame({s: v[k].astype("float64") for s, v in frames.items()}).reindex(master)
          for k in ("mcap", "ni_ttm", "equity", "pe", "pb")}
-    method = {"shares_mode": C.VALUATION_SHARES_MODE, "price_unit_vnd": C.PRICE_UNIT_VND, "basis": "consolidated, parent shareholders",
+    method = {"shares_mode": C.VALUATION_SHARES_MODE, "price_unit_vnd": C.PRICE_UNIT_VND, "basis": "as returned by Vietstock via Yuanta",
               "pe": "market cap / TTM net income (positive only)", "pb": "market cap / parent equity (positive only)",
-              "aggregate": "sum of market cap / sum of earnings (or equity) over positive members",
-              "membership": "current constituents (survivorship-biased)"}
+              "weighted": "sum of market cap / sum of earnings (or equity) over positive members = capitalization-weighted",
+              "membership": "current constituents (survivorship-biased)", "special_groups": C.SPECIAL_GROUPS,
+              "parts_unit": "billion VND"}
     write_if_changed(C.DATA / "valuation" / "snapshot.json", {"method": method, "rows": sorted(snap, key=lambda r: r["symbol"])})
 
     listing = []
-    for g in build_groups(stocks, cons, indexes) + sector_groups(stocks):
+    for g in build_groups(stocks, cons, indexes):
         cols = [m for m in g["members"] if m in frames]
         if len(cols) < C.MIN_GROUP_SIZE:
             continue
@@ -97,9 +88,12 @@ def main() -> int:
         df = df[df["n_pe"] + df["n_pb"] > 0]
         if df.empty:
             continue
+        parts = {name: p.reindex(df.index) for name, p in partition_components(M, cols, group_of).items()}
+        parts = {name: p for name, p in parts.items() if (p["n_pe"] + p["n_pb"]).fillna(0).sum() > 0}
         payload = {"id": g["id"], "label": g["label"], "kind": g["kind"], "method": method, "n_members": len(g["members"]),
                    "n_members_with_fundamentals": len(cols), "dates": [d.strftime("%Y-%m-%d") for d in df.index],
-                   "series": {c: series_list(df[c], 2) for c in df.columns}}
+                   "series": {c: series_list(df[c], 2) for c in df.columns},
+                   "parts": {name: {c: series_list(p[c], PART_DECIMALS[c]) for c in PART_DECIMALS} for name, p in sorted(parts.items())}}
         write_if_changed(C.DATA / "valuation" / f"{g['id']}.json", payload)
         last = df.iloc[-1]
         listing.append({"id": g["id"], "label": g["label"], "kind": g["kind"], "n_members": len(cols),
@@ -107,7 +101,7 @@ def main() -> int:
                         "median_pe": None if pd.isna(last["median_pe"]) else round(float(last["median_pe"]), 2),
                         "median_pb": None if pd.isna(last["median_pb"]) else round(float(last["median_pb"]), 2)})
     write_if_changed(C.DATA / "valuation" / "index.json", {"groups": listing, "method": method})
-    log.info("valuation: %d stocks, %d groups", len(frames), len(listing))
+    log.info("valuation: %d stocks, %d scopes", len(frames), len(listing))
     return 0
 
 
