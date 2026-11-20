@@ -99,3 +99,25 @@ def aggregate_group(M: dict[str, pd.DataFrame], cols: list[str], min_n: int | No
     out["pct_loss"] = (out["n_loss"] / known.sum(axis=1).replace(0, np.nan) * 100).where(known.sum(axis=1) >= min_n)
     out["mcap_total"] = mcap.sum(axis=1, min_count=1)
     return pd.DataFrame(out)
+
+
+def partition_components(M: dict[str, pd.DataFrame], cols: list[str], group_of: dict[str, str]) -> dict[str, pd.DataFrame]:
+    """Per-group additive building blocks, so any set of groups can be excluded later (e.g. in the browser).
+
+    Sums are in billion VND. Weighted P/E of any union of groups = sum(mcap_pe) / sum(ni); weighted P/B = sum(mcap_pb) / sum(eq).
+    Medians are not additive, so they are stored per group only (med_pe, med_pb).
+    """
+    pos = (M["ni_ttm"] > 0) & M["mcap"].notna()
+    pose = (M["equity"] > 0) & M["mcap"].notna()
+    by: dict[str, list[str]] = {}
+    for c in cols:
+        by.setdefault(group_of.get(c, C.UNCLASSIFIED), []).append(c)
+    out = {}
+    for g, cs in by.items():
+        mc, p, q = M["mcap"][cs], pos[cs], pose[cs]
+        out[g] = pd.DataFrame({
+            "n_pe": p.sum(axis=1), "n_pb": q.sum(axis=1),
+            "mcap_pe": mc.where(p).sum(axis=1) / 1e9, "ni": M["ni_ttm"][cs].where(p).sum(axis=1) / 1e9,
+            "mcap_pb": mc.where(q).sum(axis=1) / 1e9, "eq": M["equity"][cs].where(q).sum(axis=1) / 1e9,
+            "med_pe": M["pe"][cs].median(axis=1), "med_pb": M["pb"][cs].median(axis=1)})
+    return out
