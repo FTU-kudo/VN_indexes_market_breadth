@@ -75,3 +75,32 @@ def test_aggregate_group():
     assert g["median_pe"] == 30 and g["agg_pe"] == 1500 / 50 and g["n_pe"] == 5
     assert g["n_loss"] == 1 and abs(g["pct_loss"] - 100 / 6) < 1e-9
     assert aggregate_group(M, ["A", "B"], min_n=5).iloc[0][["median_pe", "agg_pe"]].isna().all()   # too few members
+
+
+def _matrices(seed=3, n_days=3, n=12):
+    rng = np.random.default_rng(seed)
+    d = pd.bdate_range("2025-02-03", periods=n_days)
+    cols = [f"S{i:02d}" for i in range(n)]
+    mcap = pd.DataFrame(rng.uniform(1e12, 9e13, (n_days, n)), index=d, columns=cols)
+    ni = pd.DataFrame(rng.normal(3e12, 4e12, (n_days, n)), index=d, columns=cols)
+    eq = pd.DataFrame(rng.uniform(-1e12, 5e13, (n_days, n)), index=d, columns=cols)
+    return {"mcap": mcap, "ni_ttm": ni, "equity": eq, "pe": (mcap / ni).where(ni > 0), "pb": (mcap / eq).where(eq > 0)}
+
+
+def test_partition_is_additive_and_matches_weighted_aggregate():
+    from backend.valuation import partition_components
+    M = _matrices()
+    cols = list(M["mcap"].columns)
+    group_of = {c: ("Banking" if i % 3 == 0 else "Retail" if i % 3 == 1 else "Vingroup Ecosystem") for i, c in enumerate(cols)}
+    parts = partition_components(M, cols, group_of)
+    assert set(parts) == {"Banking", "Retail", "Vingroup Ecosystem"}
+    whole = aggregate_group(M, cols, min_n=1)
+    tot = lambda k: sum(p[k] for p in parts.values())   # noqa: E731
+    assert np.allclose(tot("mcap_pe") / tot("ni"), whole["agg_pe"]) and np.allclose(tot("mcap_pb") / tot("eq"), whole["agg_pb"])
+    # excluding a group == recomputing on the remaining stocks
+    rest = [c for c in cols if group_of[c] != "Banking"]
+    ex = aggregate_group(M, rest, min_n=1)
+    inc = [parts["Retail"], parts["Vingroup Ecosystem"]]
+    assert np.allclose(sum(p["mcap_pe"] for p in inc) / sum(p["ni"] for p in inc), ex["agg_pe"])
+    assert np.allclose(sum(p["n_pe"] for p in inc), ((M["ni_ttm"][rest] > 0)).sum(axis=1))
+    assert np.allclose(parts["Banking"]["med_pe"], M["pe"][[c for c in cols if group_of[c] == "Banking"]].median(axis=1), equal_nan=True)
