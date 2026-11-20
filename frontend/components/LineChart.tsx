@@ -4,7 +4,7 @@ import { ReactNode, useEffect, useRef } from "react";
 import { useTheme } from "./ThemeProvider";
 
 export type Pt = { time: string; value: number | null; color?: string };
-export type Ser = { name: string; color: string; data: Pt[]; kind?: "line" | "hist"; width?: number };
+export type Ser = { name: string; color: string; data: Pt[]; kind?: "line" | "hist"; width?: number; scale?: "left" | "right"; dashed?: boolean };
 
 export const chartOptions = (height: number, dark = true) => ({
   height, autoSize: true,
@@ -24,12 +24,13 @@ export default function LineChart({ series, height = 260, hlines = NO_LINES, tit
   useEffect(() => {
     if (!ref.current) return;
     const chart = createChart(ref.current, chartOptions(height, theme === "dark"));
+    if (series.some((s) => s.scale === "left")) chart.applyOptions({ leftPriceScale: { visible: true, borderColor: theme === "dark" ? "#333a47" : "#d6dbe3" } });
     series.forEach((s, idx) => {
       const clean = s.data.filter((p) => p.value !== null).map((p) => ({ time: p.time, value: p.value as number, ...(p.color ? { color: p.color } : {}) }));
       if (s.kind === "hist") {
         chart.addHistogramSeries({ color: s.color, priceFormat: { type: "price", precision: 2, minMove: 0.01 } }).setData(clean);
       } else {
-        const l = chart.addLineSeries({ color: s.color, lineWidth: (s.width ?? 2) as 1 | 2 | 3 | 4, priceLineVisible: false });
+        const l = chart.addLineSeries({ color: s.color, lineWidth: (s.width ?? 2) as 1 | 2 | 3 | 4, priceLineVisible: false, priceScaleId: s.scale ?? "right", lineStyle: s.dashed ? LineStyle.Dashed : LineStyle.Solid });
         l.setData(clean);
         if (idx === 0) hlines.forEach((h) => l.createPriceLine({ price: h.value, color: h.color ?? "#475569", lineStyle: LineStyle.Dashed, lineWidth: 1, axisLabelVisible: true, title: "" }));
       }
