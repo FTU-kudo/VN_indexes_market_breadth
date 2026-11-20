@@ -54,7 +54,7 @@ STALE_FILING_DAYS = 150           # snapshot flag: latest filing is older than a
 
 # ---- Fundamentals (Yuanta -> Vietstock financial statements) ----
 URL_FIN_REPORT = "https://ysradarapi.yuanta.com.vn/api/v3/vietstock/financial_statement/report"
-FUND_REPORTS = ["KQKD", "CDKT"]   # income statement + balance sheet (CSTC ratios / LCTT cash flow are not needed for P/E, P/B)
+FUND_REPORTS = ["KQKD", "CDKT", "LCTT", "CSTC"]   # income, balance sheet, cash flow, ratios (all stored for display; P/E and P/B use only KQKD + CDKT)
 FUND_FLOOR_YEAR = 2019            # history floor; 2019 so TTM earnings exist from the first 2020 trading day
 FUND_MAX_BATCHES = 14             # each request returns 5 quarters -> up to 70 quarters
 FUND_UNIT = 1_000_000             # request unit: statement values come back in VND million
