@@ -8,7 +8,7 @@ import { Page } from "@/components/Ui";
 import { Columnar, fmt, num, Row, Status, useJSON } from "@/lib/data";
 
 /* ------------------------------------------------------------------ classification
-   "Main" = headline benchmark indices (edit this list to match the codes Yuanta returns);
+   "Main" = headline benchmark indices (edit this list to match your index codes);
    everything else is shown under "Sector indices". */
 const MAIN_ORDER = ["VNINDEX", "VN30", "VN100", "VNMID", "VNSML", "VNALL", "VNXALL", "VNX50", "HNXINDEX", "HNX30", "UPCOMINDEX"];
 const KPI_CODES = ["VNINDEX", "VN30", "HNXINDEX", "UPCOMINDEX"];   // all markets: HOSE, HOSE large caps, HNX, UPCOM
