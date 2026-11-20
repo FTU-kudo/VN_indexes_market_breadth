@@ -62,3 +62,8 @@ FUND_CUMULATIVE = False           # True if quarterly figures turn out to be yea
 PAR_VALUE_VND = 10_000            # shares outstanding ~= contributed capital / par value
 PUBLISH_LAG_DAYS = {1: 30, 2: 45, 3: 30, 4: 90}   # assumed filing deadline after quarter end (API gives no filing date)
 FUND_RECHECK_DAYS = 3             # do not re-request a symbol that is still missing the expected quarter more often than this
+
+# ---- Valuation groups (the partition used for "exclude group" analysis) ----
+# Stocks listed here form their own group and are removed from their sector, so groups never overlap.
+SPECIAL_GROUPS = {"Vingroup Ecosystem": ["VIC", "VHM", "VRE", "VPL"]}
+UNCLASSIFIED = "Unclassified"
