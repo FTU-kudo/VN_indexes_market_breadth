@@ -9,6 +9,7 @@ from backend.collect_fundamentals import build_quarters, looks_cumulative, merge
 from backend.field_map import NORM_ID_OVERRIDE, norm, pick
 from backend.fundamentals_api import expected_latest_quarter, parse_report, prev_quarter, walk_back
 from backend.peers import peer_snapshot
+from backend.statements import build_statements, merge_statements
 from backend.store import read_json, save_prices, write_if_changed
 from backend.universe import load_universe, peers_of
 
@@ -119,11 +120,11 @@ def test_sync_symbol_full_then_incremental(data_dir):
     assert sync_symbol(c, "ANV", date(2026, 11, 20), False, {}).status == "up_to_date" and len(c.calls) == n   # nothing requested
     c2 = FakeClient(last=(2026, 4))                                                 # Q4 appears later
     r = sync_symbol(c2, "ANV", date(2027, 4, 5), False, {})
-    assert r.status == "updated" and len(c2.calls) == 2                             # one window per statement, not a re-download
+    assert r.status == "updated" and len(c2.calls) == len(C.FUND_REPORTS)          # one window per report, not a re-download
     assert sync_symbol(c, "BBB", date(2026, 11, 19), False, {}).status == "updated"           # Q4 not published yet by the API
     assert sync_symbol(FakeClient(last=(2026, 3)), "BBB", date(2027, 4, 5), False, {"BBB": "2027-04-04"}).status == "skipped_recent"
     fresh = FakeClient(last=(2026, 3))
-    assert sync_symbol(fresh, "BBB", date(2027, 4, 5), False, {"BBB": "2027-03-01"}).status == "unchanged" and len(fresh.calls) == 2
+    assert sync_symbol(fresh, "BBB", date(2027, 4, 5), False, {"BBB": "2027-03-01"}).status == "unchanged" and len(fresh.calls) == len(C.FUND_REPORTS)
 
 
 def _universe(data_dir):
@@ -163,3 +164,31 @@ def test_end_to_end_prices_fundamentals_valuation_peers(data_dir, monkeypatch):
     assert {"MARKET", "HOSE", "VNINDEX", "VNFIN", "VNIT"} <= ids
     ps = peer_snapshot("AAA").set_index("group")
     assert ps.loc["VNFIN", "n"] == 3 and 0 < ps.loc["VNFIN", "pe_percentile"] <= 100
+
+
+def test_statements_build_merge_and_storage(data_dir):
+    c = FakeClient(last=(2026, 3))
+    rows = parse_report(c.report("ANV", "KQKD", 2026, 3), "KQKD") + parse_report(c.report("ANV", "CDKT", 2026, 3), "CDKT")
+    st = build_statements(rows)
+    assert [(p["y"], p["q"]) for p in st["periods"]] == [(2025, 3), (2025, 4), (2026, 1), (2026, 2), (2026, 3)]
+    ni = next(ln for ln in st["reports"]["KQKD"] if "mẹ" in ln["vi"])
+    assert ni["v"][-1] == quarter_values(2026, 3)["ni_parent"] and len(ni["v"]) == 5
+    # a later window adds Q4 and restates Q3; lines and older periods survive, nulls never erase
+    c2 = FakeClient(last=(2026, 4))
+    late = parse_report(c2.report("ANV", "KQKD", 2026, 4), "KQKD")
+    for r in late:
+        if (r["year"], r["term"]) == (2026, 3):
+            r["value"] = (r["value"] or 0) + 1
+    merged = merge_statements(st, build_statements(late))
+    assert (merged["periods"][-1]["y"], merged["periods"][-1]["q"]) == (2026, 4) and len(merged["periods"]) == 6
+    ni2 = next(ln for ln in merged["reports"]["KQKD"] if "mẹ" in ln["vi"])
+    assert ni2["v"][-2] == quarter_values(2026, 3)["ni_parent"] + 1 and ni2["v"][0] == quarter_values(2025, 3)["ni_parent"]
+    assert "CDKT" in merged["reports"]
+    # sync writes the statements file and refuses to treat a stock without one as up to date
+    assert sync_symbol(FakeClient(), "ZZZ", date(2026, 11, 19), False, {}).status == "updated"
+    stm = read_json(data_dir / "statements" / "ZZZ.json")
+    assert set(stm["reports"]) == set(C.FUND_REPORTS) and len(stm["periods"]) >= 28
+    (data_dir / "statements" / "ZZZ.json").unlink()
+    again = FakeClient()
+    assert sync_symbol(again, "ZZZ", date(2026, 11, 19), False, {}).status in ("updated", "unchanged") and again.calls
+    assert (data_dir / "statements" / "ZZZ.json").exists()
