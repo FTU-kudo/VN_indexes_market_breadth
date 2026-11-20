@@ -24,7 +24,6 @@ export default function Monitor() {
             <Card l="Failures" v={s.failures?.length ?? 0} />
             <Card l="Stale series (>10d)" v={va.data?.series_stale_over_10d} />
           </div>
-          {s.universe && <p className="text-sm text-slate-400">Symbol types listed by Yuanta: {Object.entries(s.universe.symbol_types).map(([k, n]) => `${k}: ${n}`).join(" · ")} (equities use: {s.universe.equity_types_used.join(", ")})</p>}
           <section>
             <h2 className="mb-1 font-semibold">Collection failures</h2>
             {s.failures?.length ? (
