@@ -21,6 +21,7 @@ from datetime import date, timedelta
 from . import config as C
 from .field_map import pick
 from .fundamentals_api import FundamentalsClient, assumed_publish, expected_latest_quarter, walk_back
+from .statements import build_statements, merge_statements
 from .store import read_json, update_status, utc_now_iso, write_if_changed
 from .universe import load_universe
 from .yuanta_api import YuantaAPIError, now_vn
@@ -84,20 +85,22 @@ def looks_cumulative(quarters: list[dict]) -> bool:
 
 def sync_symbol(client, sym: str, today: date, full: bool = False, checked: dict | None = None) -> Result:
     path = C.DATA / "fundamentals" / f"{sym}.json"
+    stmt_path = C.DATA / "statements" / f"{sym}.json"
     try:
         old = read_json(path) or {}
         quarters = old.get("quarters", [])
         expected = expected_latest_quarter(today)
         have = max(((int(q["period_end"][:4]), (int(q["period_end"][5:7]) - 1) // 3 + 1) for q in quarters
                     if q.get("net_income_parent") is not None), default=None)
-        if not full and have and have >= expected:
+        if not full and have and have >= expected and stmt_path.exists():
             return Result(sym, "up_to_date")
         last_check = (checked or {}).get(sym)
         if not full and quarters and last_check and (today - date.fromisoformat(last_check)).days < C.FUND_RECHECK_DAYS:
             return Result(sym, "skipped_recent")
         rows: list[dict] = []
+        deep = full or not quarters or not stmt_path.exists()      # first statement download for this stock -> whole history
         for rtype in C.FUND_REPORTS:
-            if full or not quarters:
+            if deep:
                 rows += walk_back(client, sym, rtype, expected)
             else:   # one 5-quarter window is enough for new filings and restatements
                 rows += walk_back(client, sym, rtype, expected, max_batches=1)
@@ -111,6 +114,8 @@ def sync_symbol(client, sym: str, today: date, full: bool = False, checked: dict
                    "published_basis": "assumed: period end + regulatory deadline", "unit": "VND",
                    "sources": sources, "quarters": merged}
         changed = write_if_changed(path, payload)
+        stmt = merge_statements(read_json(stmt_path) or {}, build_statements(rows))
+        changed |= write_if_changed(stmt_path, {"symbol": sym, "unit": "VND million (ratios as provided)", **stmt})
         return Result(sym, "updated" if changed else "unchanged", missing=missing)
     except (YuantaAPIError, OSError, KeyError, ValueError) as e:
         return Result(sym, "failed", error=str(e)[:300])
