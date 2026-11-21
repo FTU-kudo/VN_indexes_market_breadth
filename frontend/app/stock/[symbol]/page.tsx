@@ -1,3 +1,4 @@
+// frontend/app/stock/[symbol]/page.tsx
 "use client";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
@@ -89,7 +90,7 @@ export default function StockPage() {
           )}
           <span className="text-slate-400">Vol <b className="tabular-nums text-slate-100">{new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 2 }).format(bar.v)}</b></span>
           {vrow && <span className="text-slate-400">P/E <b className="tabular-nums text-slate-100">{fmt(vrow.pe)}</b> · P/B <b className="tabular-nums text-slate-100">{fmt(vrow.pb)}</b></span>}
-          <Link href={`/fundamental/${sym}`} className="font-medium text-sky-600 hover:underline dark:text-sky-300">Fundamental analysis →</Link>
+          <Link href={`/fundamental?s=${sym}`} className="font-medium text-sky-600 hover:underline dark:text-sky-300">Fundamental analysis →</Link>
         </div>
       )}
       {loading ? <Loading what={sym} /> : !v ? <p className="text-sm text-slate-400">No stored prices for {sym}.</p> : (
