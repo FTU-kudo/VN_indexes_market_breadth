@@ -1,3 +1,4 @@
+// frontend/app/breadth/page.tsx
 "use client";
 import { useEffect, useMemo, useState } from "react";
 import LineChart, { Ser } from "@/components/LineChart";
