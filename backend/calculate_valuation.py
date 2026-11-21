@@ -1,3 +1,4 @@
+# backend/calculate_valuation.py
 """Daily P/E and P/B for every stock, scope (market / exchange / index) and group, from prices + data/fundamentals/*.json.
 
 Outputs
@@ -11,6 +12,7 @@ from __future__ import annotations
 
 import logging
 import sys
+from collections import Counter
 
 import pandas as pd
 
@@ -44,15 +46,30 @@ def main() -> int:
 
     frames: dict[str, pd.DataFrame] = {}
     snap = []
+    cov = {"no_prices": [], "no_net_income": [], "no_equity": [], "no_shares": [], "no_ttm": []}
+    last_ni_period: Counter = Counter()
     for fp in files:
         j = read_json(fp)
         sym = (j or {}).get("symbol")
         if not sym or not j.get("quarters"):
             continue
         px = load_prices("stocks", sym)
+        qs = j["quarters"]
+        if not any(q.get("net_income_parent") is not None for q in qs):
+            cov["no_net_income"].append(sym)
+        if not any(q.get("equity_parent") is not None for q in qs):
+            cov["no_equity"].append(sym)
+        if not any(q.get("shares") is not None for q in qs):
+            cov["no_shares"].append(sym)
         if px.empty:
+            cov["no_prices"].append(sym)
             continue
         f = prepare_fundamentals(j["quarters"], C.FUND_CUMULATIVE or bool(j.get("cumulative")))
+        if f["ni_ttm"].notna().any():
+            pe_end = f.loc[f["ni_ttm"].notna(), "period_end"].iloc[-1]
+            last_ni_period[f"{pe_end.year}Q{(pe_end.month - 1) // 3 + 1}"] += 1
+        else:
+            cov["no_ttm"].append(sym)
         v = valuation_for_symbol(px["c"], f)
         if v.empty:
             continue
@@ -72,6 +89,15 @@ def main() -> int:
         return 0
     M = {k: pd.DataFrame({s: v[k].astype("float64") for s, v in frames.items()}).reindex(master)
          for k in ("mcap", "ni_ttm", "equity", "pe", "pb")}
+    now = pd.DataFrame(snap)
+    coverage = {"fundamentals_files": len(files), "stocks_valued": len(frames),
+                "latest_ttm_period": dict(sorted(last_ni_period.items())),
+                "pe_valid_now": int(now["pe"].notna().sum()), "pb_valid_now": int(now["pb"].notna().sum()),
+                "loss_making_now": int(now["loss"].fillna(False).sum()), "stale_filing_now": int(now["stale"].sum()),
+                **{k: {"count": len(v), "examples": sorted(v)[:15]} for k, v in cov.items()}}
+    write_if_changed(C.DATA / "monitor" / "valuation_coverage.json", coverage)
+    log.info("coverage: valid P/E %d, valid P/B %d of %d stocks; latest TTM period %s", coverage["pe_valid_now"], coverage["pb_valid_now"],
+             len(frames), coverage["latest_ttm_period"])
     method = {"shares_mode": C.VALUATION_SHARES_MODE, "price_unit_vnd": C.PRICE_UNIT_VND, "basis": "as returned by Vietstock via Yuanta",
               "pe": "market cap / TTM net income (positive only)", "pb": "market cap / parent equity (positive only)",
               "weighted": "sum of market cap / sum of earnings (or equity) over positive members = capitalization-weighted",
