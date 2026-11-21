@@ -1,3 +1,4 @@
+// frontend/app/page.tsx
 "use client";
 import { ArrowDownRight, ArrowUpDown, ArrowUpRight, ChevronDown, ChevronUp, Columns3, Minus, Search, X } from "lucide-react";
 import { ReactNode, useEffect, useMemo, useRef, useState } from "react";
