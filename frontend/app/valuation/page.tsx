@@ -1,3 +1,4 @@
+// frontend/app/valuation/page.tsx
 "use client";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
@@ -197,6 +198,13 @@ export default function Valuation() {
           <b className="text-sky-600 dark:text-sky-400">{w && last >= 0 ? w.npe[last] : "–"} PE / {w && last >= 0 ? w.npb[last] : "–"} PB</b> out of {rest.length}</span>
       </div>
 
+      {asOf && w && last >= 0 && (Date.now() - Date.parse(asOf) > 45 * 864e5 || w.npe[last] < 0.5 * rest.length) && (
+        <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/50 dark:text-amber-200">
+          Incomplete valuation data: the latest date with valid figures is <b>{asOf}</b> and only <b>{w.npe[last]}</b> of {rest.length} stocks have a valid P/E there.
+          Fundamentals are missing or outdated for most stocks. See <Link href="/monitor" className="underline">Data monitor → Valuation coverage</Link> for the reason.
+        </div>
+      )}
+
       {/* KPI cards */}
       <section className="grid grid-cols-2 gap-3 lg:grid-cols-4" aria-label="Key valuation figures">
         {[["Weighted P/E", w && last >= 0 ? w.pe[last] : null, "Capitalization-weighted"], ["Median P/E", medPe, `${excluded.length ? "Remaining" : "All"} ${scopeId} stocks`],
@@ -217,7 +225,7 @@ export default function Valuation() {
             <h2 className="mb-2 flex items-center gap-2 text-sm font-semibold text-slate-100">{name}<span className="rounded-full bg-blue-600 px-2 py-0.5 text-[10px] font-semibold uppercase text-white">Special group</span></h2>
             <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
               {cards.map((c) => (
-                <Link key={c.symbol} href={`/fundamental/${c.symbol}`} className="rounded-lg border border-sky-500/40 bg-sky-500/5 p-3 text-sm hover:border-sky-500">
+                <Link key={c.symbol} href={`/fundamental?s=${c.symbol}`} className="rounded-lg border border-sky-500/40 bg-sky-500/5 p-3 text-sm hover:border-sky-500">
                   <div className="text-lg font-bold text-sky-600 dark:text-sky-300">{c.symbol}</div>
                   <div className="text-xs text-slate-400">Close: <b className="text-slate-200">{compactVnd(c.close_vnd)}</b></div>
                   <div className="text-xs text-slate-400">P/E: <b className={peTone(c.pe)}>{fmt(c.pe, 2)}</b></div>
@@ -291,7 +299,7 @@ export default function Valuation() {
             <tbody>
               {table.slice((page - 1) * f.size, page * f.size).map((s) => (
                 <tr key={s.symbol} className={`border-t border-slate-800 odd:bg-slate-950 even:bg-slate-900 ${excluded.includes(s.group) ? "opacity-40" : ""}`}>
-                  <td><Link href={`/fundamental/${s.symbol}`} className="font-semibold text-sky-600 dark:text-sky-300">{s.symbol}</Link></td>
+                  <td><Link href={`/fundamental?s=${s.symbol}`} className="font-semibold text-sky-600 dark:text-sky-300">{s.symbol}</Link></td>
                   <td className="text-right text-slate-300">{compactVnd(s.close_vnd)}</td>
                   <td className={`text-right font-medium ${peTone(s.pe)}`}>{fmt(s.pe, 2)}</td>
                   <td className="text-right font-medium text-sky-600 dark:text-sky-300">{fmt(s.pb, 2)}</td>
