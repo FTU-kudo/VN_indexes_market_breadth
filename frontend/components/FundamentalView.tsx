@@ -148,6 +148,11 @@ export default function FundamentalView({ sym }: { sym: string }) {
         <div className="rounded-xl border border-slate-800 bg-slate-900 p-4 text-sm text-slate-400">No fundamentals stored for {sym} yet. Run the <b>Fundamentals update</b> workflow, or check the ticker.</div>
       ) : (
         <>
+          {fund.data.quarters.some((x) => x.period_end < "1990-01-01") && (
+            <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/50 dark:text-amber-200">
+              Some stored report dates are invalid (1970). Run <b>Fundamentals update</b> with <b>rebuild_only</b> ticked to repair them; P/E and P/B stay blank until then.
+            </div>
+          )}
           <section className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-6">
             <Card l="P/E (TTM)" v={fmt(kpi.last?.pe ?? null, 2)} n={kpi.last?.pe == null ? "loss-making or no data" : undefined} />
             <Card l="P/B" v={fmt(kpi.last?.pb ?? null, 2)} />
