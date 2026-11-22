@@ -21,7 +21,7 @@ from datetime import date, timedelta
 
 from . import config as C
 from .field_map import diagnose, pick
-from .fundamentals_api import FundamentalsClient, assumed_publish, expected_latest_quarter, walk_back
+from .fundamentals_api import FundamentalsClient, assumed_publish, expected_latest_quarter, sane_period_end, walk_back
 from .statements import build_statements, merge_statements, statements_to_rows
 from .store import read_json, update_status, utc_now_iso, write_if_changed
 from .universe import load_universe
@@ -92,6 +92,16 @@ def rebuild_symbol(sym: str, stmt: dict | None = None) -> tuple[str, ...]:
     stmt = stmt or read_json(C.DATA / "statements" / f"{sym}.json")
     if not stmt or not stmt.get("periods"):
         return ("no_statements",)
+    healed = False
+    for p in stmt["periods"]:                      # repair period dates written by an earlier parser (e.g. 1970-01-01)
+        good = sane_period_end(p["y"], p["q"], date.fromisoformat(p["end"]) if p.get("end") else None).isoformat()
+        if p.get("end") != good:
+            p["end"], healed = good, True
+        if p.get("pub") and p["pub"] < "1990":
+            del p["pub"]
+            healed = True
+    if healed:
+        write_if_changed(C.DATA / "statements" / f"{sym}.json", stmt)
     quarters, sources = build_quarters(statements_to_rows(stmt))
     if not quarters:
         return ("net_income_parent", "equity_parent", "shares")
