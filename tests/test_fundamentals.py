@@ -240,3 +240,61 @@ def test_rebuild_from_statements_without_api(data_dir):
     assert info["rebuilt"] == 1 and info["missing_latest"].get("no_statements") == 1
     from backend.statements import statements_to_rows
     assert len(statements_to_rows(read_json(data_dir / "statements" / "AAA.json"))) == len(rows)
+
+
+# ---- English labels are the primary key; Vietnamese is only a fallback
+def test_english_first_matching_and_vietnamese_fallback():
+    # the Vietnamese labels here are deliberately misleading: English decides
+    mixed = [_row("KQKD", "Lợi nhuận gộp (20)", 999.0, 1, en="Net profit after tax of minority interests"),
+             _row("KQKD", "Lợi nhuận khác", 93.0, 2, en="Profit after tax attributable to shareholders of the parent company"),
+             _row("KQKD", "Chi phí khác", 100.0, 3, en="Net profit after tax")]
+    v, src = pick(mixed, "net_income_parent")
+    assert v == 93.0 and src.startswith("[EN]")
+    assert pick(mixed, "net_income_total")[0] == 100.0
+    cd = [_row("CDKT", "Tài sản ngắn hạn", 500.0, 1, en="TOTAL OWNERS' EQUITY"), _row("CDKT", "Nợ", 900.0, 2, en="Total liabilities and owners' equity"),
+          _row("CDKT", "Hàng tồn kho", 200.0, 3, en="Contributed capital"), _row("CDKT", "Phải thu", 20.0, 4, en="Non-controlling interests")]
+    assert pick(cd, "equity_total")[0] == 500.0 and pick(cd, "charter_capital")[0] == 200.0 and pick(cd, "minority_interest")[0] == 20.0
+    cd2 = [_row("CDKT", "Vốn chủ sở hữu", 77.0, 1, en="Owner's equity")]
+    assert pick(cd2, "equity_total")[0] == 77.0                              # apostrophe variants are equal
+    only_vi = [_row("KQKD", "Lợi nhuận sau thuế của cổ đông của công ty mẹ (61)", 55.0, 1, en=None)]
+    v, src = pick(only_vi, "net_income_parent")
+    assert v == 55.0 and src.startswith("[VI fallback]")                      # no English label -> Vietnamese is used
+
+
+def test_period_dates_in_any_format_never_become_1970():
+    from datetime import date
+    from backend.fundamentals_api import parse_date, parse_report, sane_period_end
+    from backend.yuanta_api import vn_midnight_epoch
+    target = date(2026, 9, 30)
+    ms = vn_midnight_epoch(target) * 1000
+    for raw in ("2026-09-30", "2026-09-30T00:00:00", "30/09/2026", 20260930, "20260930", ms, str(ms), vn_midnight_epoch(target), f"/Date({ms})/"):
+        assert parse_date(raw) == target, raw
+    assert parse_date(0) is None and parse_date(None) is None and parse_date("junk") is None
+    assert sane_period_end(2026, 3, date(1970, 1, 1)) == date(2026, 9, 30)    # implausible date -> the quarter label wins
+    assert sane_period_end(2026, 3, date(2026, 9, 29)) == date(2026, 9, 29)
+    resp = {"title": {"data": [{"year_period": 2026, "term_code": "Q3", "period_end": ms}, {"year_period": 2026, "term_code": "Q2", "period_end": 0}]},
+            "detail": [{"data": [{"norm_id": 1, "field_name": "x", "value": [1, 2]}]}]}
+    assert [r["period_end"] for r in parse_report(resp, "KQKD")] == [date(2026, 9, 30), date(2026, 6, 30)]
+
+
+def test_corrupted_statement_dates_are_healed_and_ttm_and_pe_work(data_dir):
+    from backend.collect_fundamentals import rebuild_symbol
+    from backend.valuation import prepare_fundamentals, valuation_for_symbol
+    import pandas as pd
+    rows = []
+    for y, q in [(2025, 3), (2025, 4), (2026, 1), (2026, 2), (2026, 3)]:
+        rows += [_row("KQKD", "x", 10.0, 3, en="Net profit after tax of parent company", y=y, q=q),
+                 _row("CDKT", "y", 500.0, 3, en="Owners' equity", y=y, q=q), _row("CDKT", "z", 200.0, 4, en="Contributed capital", y=y, q=q)]
+    st = build_statements(rows)
+    for p in st["periods"]:
+        p["end"] = "1970-01-01"                                              # what the old parser stored for every period
+    write_if_changed(data_dir / "statements" / "AAA.json", {"symbol": "AAA", **st})
+    assert rebuild_symbol("AAA") == ()
+    j = read_json(data_dir / "fundamentals" / "AAA.json")
+    assert [q["period_end"] for q in j["quarters"]] == ["2025-09-30", "2025-12-31", "2026-03-31", "2026-06-30", "2026-09-30"]
+    assert all(p["end"] >= "2025" for p in read_json(data_dir / "statements" / "AAA.json")["periods"])   # file repaired on disk
+    f = prepare_fundamentals(j["quarters"])
+    assert f["ni_ttm"].iloc[-1] == 40.0 * C.FUND_UNIT                          # four quarters of 10
+    px = pd.Series([20.0], index=pd.to_datetime(["2026-11-20"]))
+    v = valuation_for_symbol(px, f)
+    assert v["pe"].notna().all() and v["pb"].notna().all()
