@@ -3,6 +3,7 @@
 import { Loading, Page } from "@/components/Ui";
 import { Status, Validation, useJSON } from "@/lib/data";
 
+type FieldSamples = { samples: Record<string, { period: string; fields: Record<string, { matched: string | null; value: number | null; candidates: string[] }> }> };
 type Coverage = { fundamentals_files: number; stocks_valued: number; pe_valid_now: number; pb_valid_now: number; loss_making_now: number; stale_filing_now: number; latest_ttm_period: Record<string, number>; no_prices: { count: number; examples: string[] }; no_net_income: { count: number; examples: string[] }; no_equity: { count: number; examples: string[] }; no_shares: { count: number; examples: string[] }; no_ttm: { count: number; examples: string[] } };
 
 const Card = ({ l, v }: { l: string; v: React.ReactNode }) => (
@@ -13,6 +14,7 @@ export default function Monitor() {
   const st = useJSON<Status>("monitor/status.json");
   const va = useJSON<Validation>("monitor/validation.json");
   const cov = useJSON<Coverage>("monitor/valuation_coverage.json");
+  const fs = useJSON<FieldSamples>("monitor/field_samples.json");
   const s = st.data;
   return (
     <Page title="Data monitoring">
@@ -41,6 +43,26 @@ export default function Monitor() {
               {([["no_ttm", "No TTM profit (needs 4 consecutive quarters)"], ["no_net_income", "No net profit line found"], ["no_equity", "No equity line found"], ["no_shares", "No share count (contributed capital) found"], ["no_prices", "No stored prices"]] as const).map(([k, l]) => cov.data![k].count > 0 && (
                 <p key={k} className="text-xs text-slate-400"><b className="text-amber-600 dark:text-amber-300">{l}:</b> {cov.data![k].count} stocks, e.g. {cov.data![k].examples.join(", ")}</p>
               ))}
+            </section>
+          )}
+          {fs.data && Object.keys(fs.data.samples).length > 0 && (
+            <section>
+              <h2 className="mb-1 font-semibold">Field matching (sample stocks, latest report)</h2>
+              <div className="overflow-x-auto rounded-xl border border-slate-800">
+                <table className="w-full text-xs">
+                  <thead className="bg-slate-900"><tr><th>Stock</th><th>Field</th><th>Matched line item</th></tr></thead>
+                  <tbody>
+                    {Object.entries(fs.data.samples).flatMap(([sym, d]) => Object.entries(d.fields).map(([f, x]) => (
+                      <tr key={sym + f} className="border-t border-slate-800 align-top">
+                        <td className="font-medium">{sym} <span className="text-slate-500">{d.period}</span></td><td>{f}</td>
+                        <td className={x.matched ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"}>
+                          {x.matched ?? "MISSING"}{!x.matched && x.candidates.length > 0 && <div className="mt-1 text-slate-400">candidates: {x.candidates.join(" ; ")}</div>}
+                        </td>
+                      </tr>
+                    )))}
+                  </tbody>
+                </table>
+              </div>
             </section>
           )}
           <section>
