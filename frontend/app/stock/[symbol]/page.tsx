@@ -1,10 +1,11 @@
 // frontend/app/stock/[symbol]/page.tsx
 "use client";
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import CandleChart, { Candle } from "@/components/CandleChart";
 import LineChart, { Pt, Ser } from "@/components/LineChart";
+import FundamentalView from "@/components/FundamentalView";
 import { Loading, Page } from "@/components/Ui";
 import { fmt, num, PriceYear, Row, tone, useJSON } from "@/lib/data";
 import { loadPrices } from "@/lib/prices";
@@ -20,7 +21,8 @@ const GROUPS: [string, (k: string) => boolean][] = [
   ["Performance & relative strength", (k) => /^(perf|rs_|ret_)/.test(k)],
 ];
 
-export default function StockPage() {
+function StockInner() {
+  const view = useSearchParams().get("view") === "fundamental" ? "fundamental" : "technical";
   const { symbol } = useParams<{ symbol: string }>();
   const sym = decodeURIComponent(symbol).toUpperCase();
   const router = useRouter();
@@ -71,13 +73,19 @@ export default function StockPage() {
   const lines = useMemo(() => [{ value: 30, color: "#10b981" }, { value: 70, color: "#f43f5e" }], []);
 
   return (
-    <Page title={`Stock analysis – ${sym}`}>
-      <form className="flex flex-wrap items-center gap-2 text-sm" onSubmit={(e) => { e.preventDefault(); if (q.trim()) router.push(`/stock/${q.trim().toUpperCase()}`); }}>
+    <Page title={`${view === "fundamental" ? "Fundamental analysis" : "Stock analysis"} – ${sym}`}>
+      <form className="flex flex-wrap items-center gap-2 text-sm" onSubmit={(e) => { e.preventDefault(); if (q.trim()) router.push(`/stock/${q.trim().toUpperCase()}${view === "fundamental" ? "?view=fundamental" : ""}`); }}>
         <input value={q} onChange={(e) => setQ(e.target.value)} className="w-28 uppercase" aria-label="Ticker" />
         <button className="rounded bg-sky-600 px-3 py-1 text-white">Go</button>
-        {RANGES.map(([l, n]) => (
+        {view === "technical" && RANGES.map(([l, n]) => (
           <button type="button" key={l} onClick={() => setRange(n)} className={`rounded px-2 py-1 ${range === n ? "bg-sky-600 text-white" : "bg-slate-800 text-slate-300"}`}>{l}</button>
         ))}
+        <div role="tablist" aria-label="Analysis type" className="ml-2 flex rounded-lg border border-slate-800 bg-slate-900 p-0.5">
+          {([["technical", "Technical"], ["fundamental", "Fundamental"]] as const).map(([k, l]) => (
+            <button type="button" role="tab" key={k} aria-selected={view === k} onClick={() => router.replace(k === "fundamental" ? `/stock/${sym}?view=fundamental` : `/stock/${sym}`)}
+              className={`rounded-md px-3 py-1 ${view === k ? "bg-sky-600 text-white" : "text-slate-400 hover:text-slate-100"}`}>{l}</button>
+          ))}
+        </div>
       </form>
       {bar && (
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
@@ -90,9 +98,10 @@ export default function StockPage() {
           )}
           <span className="text-slate-400">Vol <b className="tabular-nums text-slate-100">{new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 2 }).format(bar.v)}</b></span>
           {vrow && <span className="text-slate-400">P/E <b className="tabular-nums text-slate-100">{fmt(vrow.pe)}</b> · P/B <b className="tabular-nums text-slate-100">{fmt(vrow.pb)}</b></span>}
-          <Link href={`/fundamental?s=${sym}`} className="font-medium text-sky-600 hover:underline dark:text-sky-300">Fundamental analysis →</Link>
+          
         </div>
       )}
+      {view === "fundamental" ? <FundamentalView sym={sym} /> : <>
       {loading ? <Loading what={sym} /> : !v ? <p className="text-sm text-slate-400">No stored prices for {sym}.</p> : (
         <>
           <CandleChart candles={v.candles} overlays={v.overlays} />
@@ -116,6 +125,11 @@ export default function StockPage() {
           ))}
         </div>
       )}
+      </>}
     </Page>
   );
+}
+
+export default function StockPage() {
+  return <Suspense fallback={<Page title="Stock analysis"><Loading what="page" /></Page>}><StockInner /></Suspense>;
 }
