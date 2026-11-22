@@ -1,6 +1,9 @@
 # backend/field_map.py
 """Turns Vietstock statement line items into the few numbers valuation needs.
 
+ENGLISH FIRST: every field is looked up by its English label (`name_en`) and only if no English label matches does the
+Vietnamese label (`name_vi`) act as a fallback. Both are normalised the same way (see `norm`).
+
 Vietstock labels often end with a formula code, e.g. "VỐN CHỦ SỞ HỮU (400=410+420)" or "Lưu chuyển tiền thuần trong kỳ
 (50=20+30+40)", and start with an enumerator ("D.", "XI.", "11."). `norm` strips both before matching.
 Matching is by name (Vietnamese or English). Pin an exact row with NORM_ID_OVERRIDE = {"net_income_parent": 123, ...}
@@ -25,6 +28,12 @@ def norm(s: str | None) -> str:
     for _ in range(2):
         s = _ENUM.sub("", s)
     return re.sub(r"\s+", " ", s).strip()
+
+
+def norm_en(s: str | None) -> str:
+    """English label: lower-case, apostrophes dropped ("Owners' equity" == "Owner's equity"), codes / enumerators stripped."""
+    s = (s or "").replace("\u2019", "'").replace("\u2018", "'").replace("'", "")
+    return norm(s)
 
 
 def _c(*pats: str) -> list[re.Pattern]:
@@ -54,6 +63,23 @@ FIELDS: dict[str, tuple[str, list[re.Pattern]]] = {
         r"^vốn điều lệ", r"^cổ phiếu phổ thông(?: có quyền biểu quyết)?$", r"^cổ phiếu phổ thông",
         r"^(contributed|owner'?s invested|paid-?in|share|charter) capital", r"^common (shares|stock)")),
 }
+NOT_PARENT_EN = r"(?!.*(non-?controlling|minority|undistributed|retained|per share))"
+FIELDS_EN: dict[str, tuple[str, list[re.Pattern]]] = {
+    "net_income_parent": ("KQKD", _c(
+        r"(profit|income|earnings).*after.*tax" + NOT_PARENT_EN + r".*(parent|shareholders|owners|equity holders)",
+        r"(parent).*(profit|income|earnings).*(after|net)" + NOT_PARENT_EN,
+        r"attributable to (the )?(owners|shareholders|equity holders)" + NOT_PARENT_EN,
+        r"^net (profit|income).*(parent)" + NOT_PARENT_EN)),
+    "net_income_total": ("KQKD", _c(
+        r"^(net )?profit after (corporate income )?tax$", r"^net profit after (corporate income )?tax$", r"^profit after tax",
+        r"^profit for the (period|year)$", r"^net (profit|income)$")),
+    "equity_total": ("CDKT", _c(
+        r"^(total )?(owners |shareholders )?equity$", r"^equity$", r"^owners equity" + r"(?!.*(liabilit|resources))")),
+    "minority_interest": ("CDKT", _c(r"(minority|non-?controlling) interests?")),
+    "charter_capital": ("CDKT", _c(
+        r"^(owners )?(contributed|invested|paid-?in|charter|share) capital$", r"^(contributed|invested|paid-?in|charter|share) capital",
+        r"^common (stock|shares)( with voting rights)?$", r"^ordinary shares")),
+}
 LABEL_TOKENS = {
     "net_income_parent": ["lợi nhuận sau thuế", "profit after tax"], "net_income_total": ["lợi nhuận sau thuế", "profit after tax"],
     "equity_total": ["vốn chủ sở hữu", "equity"], "minority_interest": ["không kiểm soát", "thiểu số", "minority", "non-controlling"],
@@ -62,18 +88,26 @@ LABEL_TOKENS = {
 
 
 def pick(rows: list[dict], field: str) -> tuple[float | None, str | None]:
-    """(value, source label) for `field` among the parsed rows of ONE period; (None, None) if not found."""
-    rtype, pats = FIELDS[field]
+    """(value, source label) for `field` among the parsed rows of ONE period; (None, None) if not found.
+
+    Order: pinned norm_id -> English label -> Vietnamese label (fallback only).
+    """
+    rtype, pats_vi = FIELDS[field]
+    pats_en = FIELDS_EN[field][1]
     cand = [r for r in rows if r["report_type"] == rtype and r["value"] is not None]
     nid = NORM_ID_OVERRIDE.get(field)
     if nid is not None:
         for r in cand:
             if r["norm_id"] == nid:
-                return r["value"], f"{r['name_vi']} (norm {nid})"
-    for p in pats:
+                return r["value"], f"[norm_id] {r['name_en'] or r['name_vi']} ({nid})"
+    for p in pats_en:
         for r in cand:
-            if p.search(norm(r["name_vi"])) or p.search(norm(r["name_en"])):
-                return r["value"], f"{r['name_vi'] or r['name_en']} (norm {r['norm_id']})"
+            if r["name_en"] and p.search(norm_en(r["name_en"])):
+                return r["value"], f"[EN] {r['name_en']} (norm {r['norm_id']})"
+    for p in pats_vi:
+        for r in cand:
+            if r["name_vi"] and p.search(norm(r["name_vi"])):
+                return r["value"], f"[VI fallback] {r['name_vi']} (norm {r['norm_id']})"
     return None, None
 
 
