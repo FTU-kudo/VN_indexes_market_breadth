@@ -1,3 +1,4 @@
+# backend/fundamentals_api.py
 """Yuanta (Vietstock) financial-statement client, response parser and walk-back pagination.
 
 Request/response layout is taken from the ANV prototype:
@@ -13,7 +14,8 @@ from __future__ import annotations
 
 import calendar
 import logging
-from datetime import date, datetime, timedelta
+import re
+from datetime import date, datetime, timedelta, timezone
 
 import pandas as pd
 
@@ -49,9 +51,66 @@ def expected_latest_quarter(today: date) -> tuple[int, int]:
     return y, q
 
 
+def _from_epoch(seconds: float) -> date | None:
+    try:
+        return datetime.fromtimestamp(seconds, C.TZ).date()
+    except (OverflowError, OSError, ValueError):
+        return None
+
+
+def parse_date(v) -> date | None:
+    """Any date the API might send: ISO text, dd/mm/yyyy, 20260930, epoch seconds / milliseconds, "/Date(1790726400000)/".
+
+    Never returns 1970-01-01 for a number that is really an epoch value (pandas would read it as nanoseconds).
+    """
+    if v is None or (isinstance(v, float) and v != v):
+        return None
+    if isinstance(v, str):
+        t = v.strip()
+        m = re.search(r"/Date\((-?\d+)", t)
+        if m:
+            return _from_epoch(int(m.group(1)) / 1000)
+        if re.fullmatch(r"\d{8,13}", t):
+            v = int(t)
+        else:
+            m = re.match(r"(\d{4})-(\d{2})-(\d{2})", t)
+            if m:
+                try:
+                    return date(int(m[1]), int(m[2]), int(m[3]))
+                except ValueError:
+                    return None
+            m = re.match(r"(\d{1,2})/(\d{1,2})/(\d{4})", t)
+            if m:
+                try:
+                    return date(int(m[3]), int(m[2]), int(m[1]))
+                except ValueError:
+                    return None
+            return None
+    if isinstance(v, (int, float)):
+        n = int(v)
+        if 19000101 <= n <= 21001231:
+            try:
+                return date(n // 10000, n // 100 % 100, n % 100)
+            except ValueError:
+                return None
+        if n >= 10**11:
+            return _from_epoch(n / 1000)
+        if n >= 10**8:
+            return _from_epoch(n)
+    return None
+
+
+def sane_period_end(year: int, q: int, candidate: date | None) -> date:
+    """The (year, quarter) label is authoritative; a parsed date is kept only if it is plausible for that quarter."""
+    ref = quarter_end(year, q)
+    if candidate is not None and 1990 <= candidate.year <= 2100 and abs((candidate - ref).days) <= 120:
+        return candidate
+    return ref
+
+
 def _date(v) -> date | None:
-    d = pd.to_datetime(v, errors="coerce")
-    return None if pd.isna(d) else d.date()
+    d = parse_date(v)
+    return d if d is not None and 1990 <= d.year <= 2100 else None
 
 
 # ---------------------------------------------------------------- parsing
@@ -66,7 +125,7 @@ def parse_report(resp: dict, report_type: str) -> list[dict]:
             continue
         y, q = int(p["year_period"]), int(term[1:])
         pub = next((_date(v) for k, v in p.items() if any(t in k.lower() for t in _PUB_KEYS) and _date(v)), None)
-        meta.append({"year": y, "term": q, "period_end": _date(p.get("period_end")) or quarter_end(y, q),
+        meta.append({"year": y, "term": q, "period_end": sane_period_end(y, q, parse_date(p.get("period_end"))),
                      "published": pub, "audited": p.get("audited_status_en")})
     rows = []
     for comp in (resp or {}).get("detail") or []:
