@@ -1,3 +1,4 @@
+# backend/collect_fundamentals.py
 """Download quarterly statements (income statement + balance sheet) for every stock and store the valuation inputs.
 
   python -m backend.collect_fundamentals                 # incremental: only stocks missing the expected latest quarter
@@ -19,9 +20,9 @@ from dataclasses import dataclass
 from datetime import date, timedelta
 
 from . import config as C
-from .field_map import pick
+from .field_map import diagnose, pick
 from .fundamentals_api import FundamentalsClient, assumed_publish, expected_latest_quarter, walk_back
-from .statements import build_statements, merge_statements
+from .statements import build_statements, merge_statements, statements_to_rows
 from .store import read_json, update_status, utc_now_iso, write_if_changed
 from .universe import load_universe
 from .yuanta_api import YuantaAPIError, now_vn
@@ -83,6 +84,25 @@ def looks_cumulative(quarters: list[dict]) -> bool:
     return bool(full) and sum(v[1] < v[2] < v[3] < v[4] for v in full) / len(full) >= 0.8
 
 
+SAMPLE_SYMBOLS = ["VIC", "VCB", "SSI", "ANV", "HPG", "FPT", "VNM", "BVH"]   # shown in Data monitor -> Field matching
+
+
+def rebuild_symbol(sym: str, stmt: dict | None = None) -> tuple[str, ...]:
+    """Derive data/fundamentals/<SYM>.json from data/statements/<SYM>.json. No API calls, so matching fixes apply instantly."""
+    stmt = stmt or read_json(C.DATA / "statements" / f"{sym}.json")
+    if not stmt or not stmt.get("periods"):
+        return ("no_statements",)
+    quarters, sources = build_quarters(statements_to_rows(stmt))
+    if not quarters:
+        return ("net_income_parent", "equity_parent", "shares")
+    write_if_changed(C.DATA / "fundamentals" / f"{sym}.json", {
+        "symbol": sym, "basis": "as returned by Vietstock (consolidated vs separate not verified)",
+        "published_basis": "API filing date when provided, otherwise assumed: period end + regulatory deadline",
+        "unit": "VND", "sources": sources, "quarters": quarters})
+    latest = quarters[-1]
+    return tuple(k for k in ("net_income_parent", "equity_parent", "shares") if latest.get(k) is None)
+
+
 def sync_symbol(client, sym: str, today: date, full: bool = False, checked: dict | None = None) -> Result:
     path = C.DATA / "fundamentals" / f"{sym}.json"
     stmt_path = C.DATA / "statements" / f"{sym}.json"
@@ -95,30 +115,43 @@ def sync_symbol(client, sym: str, today: date, full: bool = False, checked: dict
         if not full and have and have >= expected and stmt_path.exists():
             return Result(sym, "up_to_date")
         last_check = (checked or {}).get(sym)
-        if not full and quarters and last_check and (today - date.fromisoformat(last_check)).days < C.FUND_RECHECK_DAYS:
+        # throttle repeat requests only for stocks that already have statements (a missing statements file always downloads)
+        if not full and stmt_path.exists() and last_check and (today - date.fromisoformat(last_check)).days < C.FUND_RECHECK_DAYS:
             return Result(sym, "skipped_recent")
+        deep = full or not stmt_path.exists()
         rows: list[dict] = []
-        deep = full or not quarters or not stmt_path.exists()      # first statement download for this stock -> whole history
         for rtype in C.FUND_REPORTS:
-            if deep:
-                rows += walk_back(client, sym, rtype, expected)
-            else:   # one 5-quarter window is enough for new filings and restatements
-                rows += walk_back(client, sym, rtype, expected, max_batches=1)
-        new, sources = build_quarters(rows)
-        if not new:
+            rows += walk_back(client, sym, rtype, expected) if deep else walk_back(client, sym, rtype, expected, max_batches=1)
+        if not rows:
             return Result(sym, "empty")
-        merged = merge_quarters(quarters, new)
-        latest = merged[-1]
-        missing = tuple(k for k in ("net_income_parent", "equity_parent", "shares") if latest.get(k) is None)
-        payload = {"symbol": sym, "basis": "as returned by Vietstock via Yuanta (consolidated vs separate not verified)",
-                   "published_basis": "assumed: period end + regulatory deadline", "unit": "VND",
-                   "sources": sources, "quarters": merged}
-        changed = write_if_changed(path, payload)
         stmt = merge_statements(read_json(stmt_path) or {}, build_statements(rows))
-        changed |= write_if_changed(stmt_path, {"symbol": sym, "unit": "VND million (ratios as provided)", **stmt})
+        changed = write_if_changed(stmt_path, {"symbol": sym, "unit": "VND million (ratios as provided)", **stmt})
+        missing = rebuild_symbol(sym, stmt)
         return Result(sym, "updated" if changed else "unchanged", missing=missing)
     except (YuantaAPIError, OSError, KeyError, ValueError) as e:
         return Result(sym, "failed", error=str(e)[:300])
+
+
+def rebuild_all(symbols: list[str]) -> dict:
+    """Rebuild every stock's valuation inputs from stored statements; return coverage numbers for the Data monitor."""
+    miss: Counter = Counter()
+    built = 0
+    for sym in symbols:
+        if not (C.DATA / "statements" / f"{sym}.json").exists():
+            miss["no_statements"] += 1
+            continue
+        built += 1
+        for m in rebuild_symbol(sym):
+            miss[m] += 1
+    samples = {}
+    for sym in SAMPLE_SYMBOLS:
+        st = read_json(C.DATA / "statements" / f"{sym}.json")
+        if st and st.get("periods"):
+            last = st["periods"][-1]
+            rows = [r for r in statements_to_rows(st) if (r["year"], r["term"]) == (last["y"], last["q"])]
+            samples[sym] = {"period": f"Q{last['q']} {last['y']}", "fields": diagnose(rows)}
+    write_if_changed(C.DATA / "monitor" / "field_samples.json", {"samples": samples})
+    return {"rebuilt": built, "missing_latest": dict(miss)}
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -127,6 +160,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--symbols", default="")
     ap.add_argument("--workers", type=int, default=6)
     ap.add_argument("--limit", type=int, default=0, help="first N symbols only (trial runs)")
+    ap.add_argument("--rebuild-only", action="store_true", help="no downloads: rebuild fundamentals from stored statements")
     args = ap.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s", stream=sys.stdout)
 
@@ -141,6 +175,12 @@ def main(argv: list[str] | None = None) -> int:
         log.error("no stocks in data/stocks.json - run collect_data first")
         return 2
 
+    if args.rebuild_only:
+        info = rebuild_all(syms)
+        log.info("rebuild: %s", info)
+        update_status({"fundamentals_rebuild": info})
+        return 0
+
     today = now_vn().date()
     checked = read_json(CHECKED_PATH(), {}) or {}
     client, results = FundamentalsClient(), []
@@ -151,6 +191,8 @@ def main(argv: list[str] | None = None) -> int:
             if i % 100 == 0:
                 log.info("progress %d/%d", i, len(syms))
 
+    info = rebuild_all(syms)
+    log.info("rebuild: %s", info)
     cnt = Counter(r.status for r in results)
     for r in results:
         if r.status in ("updated", "unchanged", "empty", "failed"):   # symbols we actually requested today
@@ -161,7 +203,7 @@ def main(argv: list[str] | None = None) -> int:
     suspect = sum(looks_cumulative((read_json(C.DATA / "fundamentals" / f"{r.symbol}.json") or {}).get("quarters", []))
                   for r in results if r.status in ("updated", "unchanged"))
     log.info("results %s | missing fields %s | looks-cumulative %d", dict(cnt), dict(miss), suspect)
-    update_status({"fundamentals": {"universe": len(syms), **dict(cnt), "missing_fields": dict(miss),
+    update_status({"fundamentals": {"universe": len(syms), **dict(cnt), "missing_fields": dict(miss), "rebuild": info,
                                     "suspect_cumulative": suspect, "failed_list": fails[:100]}})
     ok = cnt["updated"] + cnt["unchanged"] + cnt["up_to_date"] + cnt["skipped_recent"]
     if ok == 0:
