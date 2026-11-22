@@ -1,3 +1,4 @@
+// frontend/lib/prices.ts
 import { getJSON, PriceYear } from "./data";
 
 /** All stored daily bars for a stock (falls back to an index code), oldest first. */
