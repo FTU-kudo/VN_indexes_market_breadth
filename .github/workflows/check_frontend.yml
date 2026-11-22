@@ -1,0 +1,29 @@
+# .github/workflows/check_frontend.yml
+name: Check frontend
+
+on:
+  workflow_dispatch:
+  push:
+    paths: ["frontend/**", "tools/**"]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Required files, imports and file locations
+        run: python tools/check_frontend.py
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Build the site exactly as Vercel does (shows the real error if it fails)
+        working-directory: frontend
+        env:
+          NEXT_TELEMETRY_DISABLED: "1"
+        run: |
+          npm install --no-audit --no-fund
+          npx next build
