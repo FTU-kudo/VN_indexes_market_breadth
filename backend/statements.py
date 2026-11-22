@@ -66,14 +66,25 @@ def merge_statements(old: dict, new: dict) -> dict:
             "reports": reports}
 
 
+def _pub(v):
+    from datetime import date
+    try:
+        d = date.fromisoformat(v) if v else None
+    except ValueError:
+        return None
+    return d if d and d.year >= 1990 else None
+
+
 def statements_to_rows(st: dict) -> list[dict]:
     """Inverse of build_statements: long rows again, so valuation inputs can be rebuilt offline (no API calls)."""
     from datetime import date
+
+    from .fundamentals_api import sane_period_end
     rows = []
     for rt, lines in (st.get("reports") or {}).items():
         for ln in lines:
             for p, v in zip(st["periods"], ln["v"]):
-                rows.append({"report_type": rt, "year": p["y"], "term": p["q"], "period_end": date.fromisoformat(p["end"]),
-                             "published": date.fromisoformat(p["pub"]) if p.get("pub") else None, "audited": None,
+                rows.append({"report_type": rt, "year": p["y"], "term": p["q"], "period_end": sane_period_end(p["y"], p["q"], date.fromisoformat(p["end"]) if p.get("end") else None),
+                             "published": _pub(p.get("pub")), "audited": None,
                              "component": ln.get("c"), "norm_id": ln.get("id"), "name_vi": ln.get("vi"), "name_en": ln.get("en"), "value": v})
     return rows
