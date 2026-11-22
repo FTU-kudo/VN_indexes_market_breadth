@@ -46,7 +46,7 @@ def main() -> int:
 
     frames: dict[str, pd.DataFrame] = {}
     snap = []
-    cov = {"no_prices": [], "no_net_income": [], "no_equity": [], "no_shares": [], "no_ttm": []}
+    cov = {"no_prices": [], "no_net_income": [], "no_equity": [], "no_shares": [], "no_ttm": [], "invalid_dates": []}
     last_ni_period: Counter = Counter()
     for fp in files:
         j = read_json(fp)
@@ -55,6 +55,8 @@ def main() -> int:
             continue
         px = load_prices("stocks", sym)
         qs = j["quarters"]
+        if any(q["period_end"] < "1990-01-01" for q in qs):
+            cov["invalid_dates"].append(sym)
         if not any(q.get("net_income_parent") is not None for q in qs):
             cov["no_net_income"].append(sym)
         if not any(q.get("equity_parent") is not None for q in qs):
