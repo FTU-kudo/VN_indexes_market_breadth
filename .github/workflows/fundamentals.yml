@@ -1,8 +1,9 @@
+# .github/workflows/fundamentals.yml
 name: Fundamentals update
 
 on:
-  # schedule:
-  #   - cron: "0 12 * * 1-5"      # 19:00 Vietnam time, Mon-Fri; most runs find nothing new and commit nothing
+  schedule:
+    - cron: "0 12 * * 1-5"      # 19:00 Vietnam time, Mon-Fri; most runs find nothing new and commit nothing
   workflow_dispatch:
     inputs:
       full:
@@ -17,6 +18,10 @@ on:
         description: "Trial run: only the first N stocks (0 = all)"
         type: string
         default: "0"
+      rebuild_only:
+        description: "No downloads: rebuild P/E inputs from the statements already stored (fast; use after a matching fix)"
+        type: boolean
+        default: false
 
 concurrency:
   group: market-data-update      # same group as the price workflows: one writer at a time
@@ -44,11 +49,13 @@ jobs:
           FULL: ${{ inputs.full }}
           SYMBOLS: ${{ inputs.symbols }}
           LIMIT: ${{ inputs.limit }}
+          REBUILD: ${{ inputs.rebuild_only }}
         run: |
           ARGS=""
           [ "$FULL" = "true" ] && ARGS="$ARGS --full"
           [ -n "$SYMBOLS" ] && ARGS="$ARGS --symbols $SYMBOLS"
           [ -n "$LIMIT" ] && [ "$LIMIT" != "0" ] && ARGS="$ARGS --limit $LIMIT"
+          [ "$REBUILD" = "true" ] && ARGS="$ARGS --rebuild-only"
           set +e
           python -m backend.collect_fundamentals $ARGS
           rc=$?
