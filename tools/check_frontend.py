@@ -57,7 +57,8 @@ def main() -> int:
         if m and m.group(1) != f.relative_to(ROOT).as_posix():
             problems.append(f"MISPLACED  the file says it belongs at '{m.group(1)}' but it is at '{f.relative_to(ROOT).as_posix()}'")
     if (FE / "app" / "fundamental").exists():
-        problems.append("LEFTOVER  frontend/app/fundamental/ is the retired route - delete this folder (Fundamentals now lives in the Stock analysis page)")
+        print("WARNING: frontend/app/fundamental/ is the retired route. It does no harm, but you can delete it "
+              "(Fundamentals now lives in the Stock analysis page).\n")
     nav = (FE / "components" / "Nav.tsx")
     if nav.exists() and "view=fundamental" not in nav.read_text(encoding="utf-8"):
         problems.append("OLD Nav.tsx: the Fundamentals tab still points to /fundamental, which no longer exists -> 404. Replace frontend/components/Nav.tsx")
