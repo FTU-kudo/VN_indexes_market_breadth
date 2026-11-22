@@ -1,3 +1,4 @@
+# tests/test_fundamentals.py
 from datetime import date
 
 import pandas as pd
@@ -192,3 +193,50 @@ def test_statements_build_merge_and_storage(data_dir):
     again = FakeClient()
     assert sync_symbol(again, "ZZZ", date(2026, 11, 19), False, {}).status in ("updated", "unchanged") and again.calls
     assert (data_dir / "statements" / "ZZZ.json").exists()
+
+
+# ---- real Vietstock labels carry formula codes ("(400=410+420)") and enumerators ("D.", "XI.")
+def _row(rt, vi, v, nid=1, en=None, y=2026, q=3):
+    from datetime import date
+    return {"report_type": rt, "year": y, "term": q, "period_end": date(y, q * 3, 30), "published": None, "audited": None,
+            "component": "x", "norm_id": nid, "name_vi": vi, "name_en": en, "value": v}
+
+
+def test_labels_with_formula_suffixes_and_enumerators():
+    from backend.field_map import norm
+    assert norm("D - VỐN CHỦ SỞ HỮU (400 = 410 + 420)") == "vốn chủ sở hữu"
+    assert norm("XI. Lợi nhuận sau thuế của cổ đông của công ty mẹ (61)") == "lợi nhuận sau thuế của cổ đông của công ty mẹ"
+    assert norm("Lưu chuyển tiền thuần trong kỳ (50=20+30+40)") == "lưu chuyển tiền thuần trong kỳ"
+    kq = [_row("KQKD", "Lợi nhuận sau thuế thu nhập doanh nghiệp (60=50-51-52)", 100.0, 1),
+          _row("KQKD", "Lợi nhuận sau thuế của cổ đông không kiểm soát (62)", 7.0, 2),
+          _row("KQKD", "Lợi nhuận sau thuế của cổ đông của công ty mẹ (61)", 93.0, 3)]
+    assert pick(kq, "net_income_parent")[0] == 93.0                      # not the total, not the minority line
+    assert pick(kq[:2], "net_income_parent")[0] is None                   # minority line alone is never "parent profit"
+    assert pick(kq[:2], "net_income_total")[0] == 100.0                   # falls back to total profit only via the total rule
+    only_cd = [_row("KQKD", "Lợi nhuận sau thuế của cổ đông (61)", 55.0), _row("KQKD", "Lợi nhuận sau thuế của cổ đông không kiểm soát", 5.0, 2)]
+    assert pick(only_cd, "net_income_parent")[0] == 55.0                  # name without "công ty mẹ" (as in the ANV notebook)
+    cd = [_row("CDKT", "TỔNG CỘNG TÀI SẢN (270)", 900.0, 1), _row("CDKT", "NỢ PHẢI TRẢ (300)", 400.0, 2),
+          _row("CDKT", "D - VỐN CHỦ SỞ HỮU (400=410+420)", 500.0, 3), _row("CDKT", "Vốn góp của chủ sở hữu (411)", 200.0, 4),
+          _row("CDKT", "Lợi ích của cổ đông không kiểm soát (429)", 20.0, 5), _row("CDKT", "TỔNG CỘNG NGUỒN VỐN (440)", 900.0, 6),
+          _row("CDKT", "Nợ phải trả và vốn chủ sở hữu", 900.0, 7)]
+    assert pick(cd, "equity_total")[0] == 500.0 and pick(cd, "charter_capital")[0] == 200.0 and pick(cd, "minority_interest")[0] == 20.0
+    bank = [_row("CDKT", "VỐN CHỦ SỞ HỮU", 50.0), _row("CDKT", "Vốn điều lệ", 30.0, 2)]
+    assert pick(bank, "equity_total")[0] == 50.0 and pick(bank, "charter_capital")[0] == 30.0
+
+
+def test_rebuild_from_statements_without_api(data_dir):
+    from backend.collect_fundamentals import rebuild_all, rebuild_symbol
+    rows = []
+    for y, q in [(2025, 3), (2025, 4), (2026, 1), (2026, 2), (2026, 3)]:
+        rows += [_row("KQKD", "Lợi nhuận sau thuế của cổ đông của công ty mẹ (61)", 10.0 * q, 3, y=y, q=q),
+                 _row("CDKT", "VỐN CHỦ SỞ HỮU (400=410+420)", 500.0, 3, y=y, q=q), _row("CDKT", "Vốn góp của chủ sở hữu (411)", 200.0, 4, y=y, q=q)]
+    write_if_changed(data_dir / "statements" / "AAA.json", {"symbol": "AAA", **build_statements(rows)})
+    assert rebuild_symbol("AAA") == ()                                    # nothing missing in the latest quarter
+    j = read_json(data_dir / "fundamentals" / "AAA.json")
+    last = j["quarters"][-1]
+    assert last["net_income_parent"] == 30.0 * C.FUND_UNIT and last["equity_parent"] == 500.0 * C.FUND_UNIT
+    assert last["shares"] == 200.0 * C.FUND_UNIT / C.PAR_VALUE_VND
+    info = rebuild_all(["AAA", "NOPE"])
+    assert info["rebuilt"] == 1 and info["missing_latest"].get("no_statements") == 1
+    from backend.statements import statements_to_rows
+    assert len(statements_to_rows(read_json(data_dir / "statements" / "AAA.json"))) == len(rows)
