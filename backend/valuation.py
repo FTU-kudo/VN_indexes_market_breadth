@@ -1,3 +1,4 @@
+# backend/valuation.py
 """P/E and P/B engine. Pure functions (no I/O) so everything is unit-testable.
 
 Fundamentals schema (one file per stock, data/fundamentals/<SYM>.json), money in VND, consolidated figures:
@@ -45,6 +46,9 @@ def prepare_fundamentals(quarters: list[dict], cumulative: bool = False) -> pd.D
     if q.empty:
         return pd.DataFrame(columns=["published", "period_end", "ni_ttm", "equity", "shares"])
     q["period_end"], q["published"] = pd.to_datetime(q["period_end"]), pd.to_datetime(q["published"])
+    q = q[q["period_end"] >= "1990-01-01"]                    # impossible dates (e.g. 1970-01-01) are dropped, not merged into one quarter
+    if q.empty:
+        return pd.DataFrame(columns=["published", "period_end", "ni_ttm", "equity", "shares"])
     q = q.sort_values("period_end").drop_duplicates("period_end", keep="last").reset_index(drop=True)
     ni = ytd_to_quarterly(q["period_end"], q["net_income_parent"]) if cumulative else pd.to_numeric(q["net_income_parent"], errors="coerce")
     key = _qkey(q["period_end"])
