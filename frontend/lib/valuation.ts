@@ -11,7 +11,8 @@ const DAY = 86_400_000;
 /** One entry per filing: TTM net income needs four consecutive single quarters, otherwise it is unknown (never guessed). */
 export function prepareFilings(quarters: Quarter[], cumulative = false): Filing[] {
   const byEnd = new Map(quarters.map((q) => [q.period_end, q]));
-  const qs = [...byEnd.values()].sort((a, b) => (a.period_end < b.period_end ? -1 : 1));
+  // impossible dates (e.g. 1970-01-01 from an old import) are skipped, never merged into one quarter
+  const qs = [...byEnd.values()].filter((q) => q.period_end >= "1990-01-01").sort((a, b) => (a.period_end < b.period_end ? -1 : 1));
   const key = qs.map((q) => qkey(q.period_end));
   const ni: (number | null)[] = qs.map((q, i) => {
     const v = q.net_income_parent;
