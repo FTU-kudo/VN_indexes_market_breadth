@@ -54,7 +54,7 @@ FIELDS: dict[str, tuple[str, list[re.Pattern]]] = {
         r"^lợi nhuận sau thuế thu nhập doanh nghiệp$", r"^lợi nhuận sau thuế(?: tndn)?$", r"^lợi nhuận kế toán sau thuế$",
         r"^(net )?profit after (corporate income )?tax$", r"^profit after tax", r"^net (profit|income)$")),
     "equity_total": ("CDKT", _c(
-        r"^vốn chủ sở hữu$", r"^vốn chủ sở hữu(?!.*(nợ phải trả|nguồn vốn))",
+        r"^vốn chủ sở hữu$", r"^vốn và các quỹ$", r"^vốn và quỹ$", r"^vốn chủ sở hữu(?!.*(nợ phải trả|nguồn vốn))",
         r"^total (owners'? |shareholders'? )?equity$", r"^(owners'?|shareholders'?) equity$", r"^equity$")),
     "minority_interest": ("CDKT", _c(
         r"lợi ích (của )?cổ đông (không kiểm soát|thiểu số)", r"^cổ đông (không kiểm soát|thiểu số)", r"non-?controlling interests?", r"minority interests?")),
@@ -74,16 +74,23 @@ FIELDS_EN: dict[str, tuple[str, list[re.Pattern]]] = {
         r"^(net )?profit after (corporate income )?tax$", r"^net profit after (corporate income )?tax$", r"^profit after tax",
         r"^profit for the (period|year)$", r"^net (profit|income)$")),
     "equity_total": ("CDKT", _c(
-        r"^(total )?(owners |shareholders )?equity$", r"^equity$", r"^owners equity" + r"(?!.*(liabilit|resources))")),
+        r"^(total )?(owners |shareholders )?equity$", r"^equity$", r"^owners equity" + r"(?!.*(liabilit|resources))",
+        r"^(owners |shareholders )?capital and (reserves|funds)$", r"^equity and (reserves|funds)$")),
     "minority_interest": ("CDKT", _c(r"(minority|non-?controlling) interests?")),
     "charter_capital": ("CDKT", _c(
         r"^(owners )?(contributed|invested|paid-?in|charter|share) capital$", r"^(contributed|invested|paid-?in|charter|share) capital",
         r"^common (stock|shares)( with voting rights)?$", r"^ordinary shares")),
 }
+# Totals used only to DERIVE equity (total assets - total liabilities) when no equity line is recognised (banks, odd layouts).
+FIELDS["total_assets"] = ("CDKT", _c(r"^tổng (cộng )?tài sản$", r"^tài sản$(?!.*nợ)"))
+FIELDS["total_liabilities"] = ("CDKT", _c(r"^(tổng (cộng )?)?nợ phải trả$", r"^tổng nợ$"))
+FIELDS_EN["total_assets"] = ("CDKT", _c(r"^total assets$", r"^total (resources|asset)$", r"^assets$"))
+FIELDS_EN["total_liabilities"] = ("CDKT", _c(r"^total liabilities$", r"^liabilities$", r"^total debts?$"))
 LABEL_TOKENS = {
     "net_income_parent": ["lợi nhuận sau thuế", "profit after tax"], "net_income_total": ["lợi nhuận sau thuế", "profit after tax"],
     "equity_total": ["vốn chủ sở hữu", "equity"], "minority_interest": ["không kiểm soát", "thiểu số", "minority", "non-controlling"],
     "charter_capital": ["vốn góp", "vốn đầu tư", "vốn điều lệ", "cổ phiếu phổ thông", "capital"],
+    "total_assets": ["tổng", "total assets"], "total_liabilities": ["nợ phải trả", "liabilities"],
 }
 
 
