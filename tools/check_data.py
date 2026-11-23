@@ -75,7 +75,7 @@ def main() -> int:
     if samples:
         print("\nfield matching (sample stocks):")
         for sym, d in samples.items():
-            miss = [f for f, x in d["fields"].items() if not x["matched"] and f not in ("net_income_total", "minority_interest")]
+            miss = [f for f, x in d["fields"].items() if not x["matched"] and f not in ("net_income_total", "minority_interest", "total_assets", "total_liabilities")]
             langs = {x["matched"].split("]")[0] + "]" for x in d["fields"].values() if x["matched"]}
             print(f"  {sym:5} {d['period']}: {'MISSING ' + ', '.join(miss) if miss else 'ok'}  via {', '.join(sorted(langs))}")
     if problems:
