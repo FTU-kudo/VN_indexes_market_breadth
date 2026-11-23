@@ -298,3 +298,24 @@ def test_corrupted_statement_dates_are_healed_and_ttm_and_pe_work(data_dir):
     px = pd.Series([20.0], index=pd.to_datetime(["2026-11-20"]))
     v = valuation_for_symbol(px, f)
     assert v["pe"].notna().all() and v["pb"].notna().all()
+
+
+# ---- banks (Circular 49): no "Vốn chủ sở hữu" line; equity is "Vốn và các quỹ" / derived from assets - liabilities
+def test_bank_equity_from_capital_and_reserves_or_balance_sheet_identity():
+    from backend.collect_fundamentals import build_quarters
+    kq = _row("KQKD", "Lợi nhuận sau thuế của cổ đông của Ngân hàng mẹ", 40.0, 1, en="Net profit after tax attributable to parent bank")
+    ta = _row("CDKT", "TỔNG TÀI SẢN", 1000.0, 2, en="TOTAL ASSETS")
+    tl = _row("CDKT", "TỔNG NỢ PHẢI TRẢ", 900.0, 3, en="TOTAL LIABILITIES")
+    cc = _row("CDKT", "Vốn điều lệ", 300.0, 4, en="Charter capital")
+    mi = _row("CDKT", "Lợi ích của cổ đông thiểu số", 5.0, 5, en="Minority interests")
+    direct = _row("CDKT", "VỐN VÀ CÁC QUỸ", 100.0, 6, en="Capital and reserves")
+    q, src = build_quarters([kq, ta, tl, cc, mi, direct])
+    assert q[0]["equity_parent"] == (100.0 - 5.0) * C.FUND_UNIT                        # matched line minus minority
+    q, src = build_quarters([kq, ta, tl, cc, mi])                                       # no recognised equity line at all
+    assert q[0]["equity_parent"] == (1000.0 - 900.0 - 5.0) * C.FUND_UNIT and "derived" in src["equity"]
+    assert q[0]["shares"] == 300.0 * C.FUND_UNIT / C.PAR_VALUE_VND
+    q, _ = build_quarters([kq, ta, _row("CDKT", "NỢ", 1200.0, 3, en="TOTAL LIABILITIES"), cc])
+    assert q[0]["equity_parent"] is None                                                # liabilities > assets: never invent equity
+    # the identity is only a fallback: a real equity line always wins
+    q, _ = build_quarters([kq, ta, tl, _row("CDKT", "VỐN CHỦ SỞ HỮU (400)", 90.0, 7, en="Owner's equity")])
+    assert q[0]["equity_parent"] == 90.0 * C.FUND_UNIT
