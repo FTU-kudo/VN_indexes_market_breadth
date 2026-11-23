@@ -51,6 +51,11 @@ def build_quarters(rows: list[dict]) -> tuple[list[dict], dict]:
             ni, ni_src = pick(rs, "net_income_total")
             ni_src = f"FALLBACK total profit: {ni_src}" if ni_src else None
         eq, eq_src = pick(rs, "equity_total")
+        if eq is None:       # banks and odd layouts: equity = total assets - total liabilities (minority interests are subtracted below)
+            ta, _ = pick(rs, "total_assets")
+            tl, _ = pick(rs, "total_liabilities")
+            if ta is not None and tl is not None and ta - tl > 0:
+                eq, eq_src = ta - tl, "derived: total assets - total liabilities"
         mi, _ = pick(rs, "minority_interest")
         cc, cc_src = pick(rs, "charter_capital")
         if ni is None and eq is None and cc is None:
