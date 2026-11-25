@@ -92,6 +92,18 @@ def looks_cumulative(quarters: list[dict]) -> bool:
 SAMPLE_SYMBOLS = ["VIC", "VCB", "SSI", "ANV", "HPG", "FPT", "VNM", "BVH"]   # shown in Data monitor -> Field matching
 
 
+def floor_marker() -> int | None:
+    m = read_json(C.DATA / "monitor" / "history_start.json", {}) or {}
+    return m.get("fundamentals_floor_year")
+
+
+def mark_floor() -> None:
+    m = read_json(C.DATA / "monitor" / "history_start.json", {}) or {}
+    m["fundamentals_floor_year"] = C.FUND_FLOOR_YEAR
+    m["fundamentals_downloaded_utc"] = utc_now_iso()
+    write_if_changed(C.DATA / "monitor" / "history_start.json", m)
+
+
 def rebuild_symbol(sym: str, stmt: dict | None = None) -> tuple[str, ...]:
     """Derive data/fundamentals/<SYM>.json from data/statements/<SYM>.json. No API calls, so matching fixes apply instantly."""
     stmt = stmt or read_json(C.DATA / "statements" / f"{sym}.json")
@@ -196,6 +208,10 @@ def main(argv: list[str] | None = None) -> int:
         update_status({"fundamentals_rebuild": info})
         return 0
 
+    fm = floor_marker()
+    if not args.symbols and not args.full and (fm is None or fm > C.FUND_FLOOR_YEAR):
+        log.info("statements floor moved to %s -> one full re-download", C.FUND_FLOOR_YEAR)
+        args.full = True
     today = now_vn().date()
     checked = read_json(CHECKED_PATH(), {}) or {}
     client, results = FundamentalsClient(), []
@@ -221,6 +237,8 @@ def main(argv: list[str] | None = None) -> int:
     update_status({"fundamentals": {"universe": len(syms), **dict(cnt), "missing_fields": dict(miss), "rebuild": info,
                                     "suspect_cumulative": suspect, "failed_list": fails[:100]}})
     ok = cnt["updated"] + cnt["unchanged"] + cnt["up_to_date"] + cnt["skipped_recent"]
+    if args.full and not args.symbols and not args.limit and cnt["failed"] <= 0.05 * max(len(syms), 1):
+        mark_floor()
     if ok == 0:
         return 2
     return 1 if cnt["failed"] / max(len(syms) - cnt["up_to_date"] - cnt["skipped_recent"], 1) > 0.2 else 0
