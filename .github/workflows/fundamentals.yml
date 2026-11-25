@@ -3,7 +3,7 @@ name: Fundamentals update
 
 on:
   schedule:
-    - cron: "0 10 * * 1-5"      # 17:00 Vietnam time, Mon-Fri; most runs find nothing new and commit nothing
+    - cron: "0 12 * * 1-5"      # 19:00 Vietnam time, Mon-Fri; most runs find nothing new and commit nothing
   workflow_dispatch:
     inputs:
       full:
@@ -65,6 +65,8 @@ jobs:
           exit 0
 
       - run: python -m backend.calculate_valuation
+      - run: python -m backend.history_coverage   # actual start year of prices, statements and valuation
+      - run: python -m backend.era_compare        # before / after 2020 comparison with generated highlights
 
       - name: Commit and push (only if something changed)
         run: |
