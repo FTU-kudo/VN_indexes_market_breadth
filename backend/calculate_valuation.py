@@ -125,7 +125,7 @@ def main() -> int:
         write_if_changed(C.DATA / "valuation" / f"{g['id']}.json", payload)
         last = df.iloc[-1]
         listing.append({"id": g["id"], "label": g["label"], "kind": g["kind"], "n_members": len(cols),
-                        "last_date": df.index[-1].strftime("%Y-%m-%d"),
+                        "first_date": df.index[0].strftime("%Y-%m-%d"), "last_date": df.index[-1].strftime("%Y-%m-%d"),
                         "median_pe": None if pd.isna(last["median_pe"]) else round(float(last["median_pe"]), 2),
                         "median_pb": None if pd.isna(last["median_pb"]) else round(float(last["median_pb"]), 2)})
     write_if_changed(C.DATA / "valuation" / "index.json", {"groups": listing, "method": method})
