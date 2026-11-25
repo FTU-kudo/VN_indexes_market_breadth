@@ -1,8 +1,13 @@
+# .github/workflows/daily_update.yml
 name: Daily update
 
 on:
   # schedule:
-  #   - cron: "0 9 * * 1-5"      # 09:00 UTC = 16:00 Vietnam time, Mon-Fri
+  #   # Mon-Fri. Yuanta publishes the final daily bar some time after the 15:00 close, so try three times;
+  #   # every run is idempotent and commits nothing when there is no new data.
+  #   - cron: "0 9 * * 1-5"      # 16:00 Vietnam time
+  #   - cron: "30 10 * * 1-5"    # 17:30 Vietnam time
+  #   - cron: "0 13 * * 1-5"     # 20:00 Vietnam time (catch-up)
   workflow_dispatch:
 
 concurrency:
@@ -39,7 +44,12 @@ jobs:
           exit 0
       - run: python -m backend.calculate_indicators
       - run: python -m backend.calculate_breadth
+      - run: python -m backend.calculate_valuation   # no-op until data/fundamentals exists
       - run: python -m backend.validate_data
+      - run: python -m backend.history_coverage   # actual start year of prices, statements and valuation
+      - run: python -m backend.era_compare        # before / after 2020 comparison with generated highlights
+      - name: Report latest trading date
+        run: python -c "import json;s=json.load(open('data/monitor/status.json'));print('::notice::latest_trading_date =', s['latest_trading_date'], '| updated symbols =', s['collect']['updated'])"
       - name: Commit and push (only if something changed)
         run: |
           git config user.name "github-actions[bot]"
