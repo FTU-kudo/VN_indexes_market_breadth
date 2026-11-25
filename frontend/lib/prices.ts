@@ -1,10 +1,13 @@
 // frontend/lib/prices.ts
 import { getJSON, PriceYear } from "./data";
 
+/** First calendar year requested from the data folder (years without data simply return nothing). */
+export const FIRST_YEAR = 2010;
+
 /** All stored daily bars for a stock (falls back to an index code), oldest first. */
 export async function loadPrices(sym: string): Promise<{ bars: PriceYear; kind: string } | null> {
   for (const kind of ["stocks", "indexes"]) {
-    const years = Array.from({ length: new Date().getFullYear() - 2019 }, (_, i) => 2020 + i);
+    const years = Array.from({ length: new Date().getFullYear() - FIRST_YEAR + 1 }, (_, i) => FIRST_YEAR + i);
     const parts = (await Promise.all(years.map((y) => getJSON<PriceYear>(`prices/${kind}/${sym}/${y}.json`)))).filter(Boolean) as PriceYear[];
     if (parts.length) {
       const bars: PriceYear = { d: [], o: [], h: [], l: [], c: [], v: [] };
