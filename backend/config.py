@@ -1,3 +1,4 @@
+# backend/config.py
 """Central configuration. Everything tunable lives here."""
 from __future__ import annotations
 
@@ -16,7 +17,7 @@ URL_INDEX_LIST = f"{BASE}/api/v3/market_data/price_board/index/list_index"
 URL_STOCK_INFO = f"{BASE}/api/v3/market_data/price_board/stock/list_stock_info"
 URL_HISTORY = f"{BASE}/v2/tradingview/history"
 
-START_DATE = date(2020, 1, 1)
+START_DATE = date(2010, 1, 1)   # requested history start; the real start per symbol is whatever the API has (see monitor/history_coverage.json)
 EXCHANGES = ["HSX", "HNX", "UPCOM"]          # API codes; HSX == HOSE
 EXCHANGE_LABEL = {"HSX": "HOSE", "HNX": "HNX", "UPCOM": "UPCOM"}
 # SymbolType values treated as ordinary equities. The first run logs the distribution of
@@ -55,8 +56,8 @@ STALE_FILING_DAYS = 150           # snapshot flag: latest filing is older than a
 # ---- Fundamentals (Yuanta -> Vietstock financial statements) ----
 URL_FIN_REPORT = "https://ysradarapi.yuanta.com.vn/api/v3/vietstock/financial_statement/report"
 FUND_REPORTS = ["KQKD", "CDKT", "LCTT", "CSTC"]   # income, balance sheet, cash flow, ratios (all stored for display; P/E and P/B use only KQKD + CDKT)
-FUND_FLOOR_YEAR = 2019            # history floor; 2019 so TTM earnings exist from the first 2020 trading day
-FUND_MAX_BATCHES = 14             # each request returns 5 quarters -> up to 70 quarters
+FUND_FLOOR_YEAR = 2009            # statements floor; one year before START_DATE so TTM earnings can exist from the first 2010 trading days
+FUND_MAX_BATCHES = 16             # each request returns 5 quarters -> up to 80 quarters (2009Q1..2026Q4 is 72)
 FUND_UNIT = 1_000_000             # request unit: statement values come back in VND million
 FUND_CUMULATIVE = False           # True if quarterly figures turn out to be year-to-date (see discover_fields)
 PAR_VALUE_VND = 10_000            # shares outstanding ~= contributed capital / par value
@@ -67,3 +68,6 @@ FUND_RECHECK_DAYS = 3             # do not re-request a symbol that is still mis
 # Stocks listed here form their own group and are removed from their sector, so groups never overlap.
 SPECIAL_GROUPS = {"Vingroup Ecosystem": ["VIC", "VHM", "VRE", "VPL"]}
 UNCLASSIFIED = "Unclassified"
+
+# ---- Eras for the before/after comparison
+ERA_SPLIT = date(2020, 1, 1)
