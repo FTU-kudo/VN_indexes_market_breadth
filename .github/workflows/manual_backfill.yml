@@ -1,3 +1,4 @@
+# .github/workflows/manual_backfill.yml
 name: Manual backfill
 
 on:
@@ -51,7 +52,10 @@ jobs:
           exit 0
       - run: python -m backend.calculate_indicators
       - run: python -m backend.calculate_breadth
+      - run: python -m backend.calculate_valuation   # no-op until data/fundamentals exists
       - run: python -m backend.validate_data
+      - run: python -m backend.history_coverage   # actual start year of prices, statements and valuation
+      - run: python -m backend.era_compare        # before / after 2020 comparison with generated highlights
       - name: Commit and push 
         run: |
           git config user.name "github-actions[bot]"
