@@ -14,7 +14,7 @@ type Listing = { id: string; label: string; kind: string; n_members: number; las
 type Stock = { symbol: string; exchange: string | null; sector: string; industry: string; group: string; close_vnd: number | null; pe: number | null; pb: number | null; mcap: number | null; stale: boolean };
 type Snapshot = { method: { special_groups: Record<string, string[]> }; rows: Stock[] };
 
-const RANGES: [string, number | "ytd"][] = [["5Y", 1260], ["3Y", 756], ["1Y", 252], ["YTD", "ytd"], ["3M", 63]];
+const RANGES: [string, number | "ytd"][] = [["All", 1e9], ["10Y", 2520], ["5Y", 1260], ["3Y", 756], ["1Y", 252], ["YTD", "ytd"], ["3M", 63]];
 const METRICS = [["wpe", "Weighted P/E"], ["wpb", "Weighted P/B"], ["mpe", "Median P/E"], ["mpb", "Median P/B"]] as const;
 type Metric = (typeof METRICS)[number][0];
 const TOTAL = "__total__";
@@ -22,6 +22,7 @@ const PALETTE = ["#38bdf8", "#f59e0b", "#34d399", "#f43f5e", "#a78bfa", "#fb923c
 
 /* ---------------------------------------------------------------- helpers */
 const ratio = (a: number | null | undefined, b: number | null | undefined) => (a != null && b != null && b > 0 ? a / b : null);
+const mean = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / xs.length;
 const median = (xs: number[]) => { if (!xs.length) return null; const s = [...xs].sort((a, b) => a - b), m = s.length >> 1; return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; };
 const compactVnd = (v: number | null) => (v == null ? "–" : v >= 1e6 ? `${(v / 1e6).toFixed(2)}M` : v >= 1e3 ? `${(v / 1e3).toFixed(1)}K` : v.toFixed(0));
 /** Traffic-light colour for a P/E: <12 green, <20 blue, <30 yellow, otherwise red. */
@@ -110,6 +111,21 @@ export default function Valuation() {
     };
     return { all: calc(() => true), rest: calc((g) => !excluded.includes(g)) };
   }, [sc.data, groups, excluded]);
+
+  /* before / after 2020 for the weighted P/E and P/B of the included groups */
+  const ERA = "2020-01-01";
+  const era = useMemo(() => {
+    if (!sc.data || !weighted) return null;
+    const dates = sc.data.dates;
+    const stat = (arr: (number | null)[]) => {
+      const pre: number[] = [], post: number[] = [];
+      arr.forEach((v, i) => { if (v !== null) (dates[i] < ERA ? pre : post).push(v); });
+      const f = (x: number[]) => (x.length ? { mean: mean(x), min: Math.min(...x), max: Math.max(...x), n: x.length } : null);
+      const now = [...arr].reverse().find((v) => v !== null) ?? null;
+      return { pre: f(pre), post: f(post), now };
+    };
+    return { first: dates[0], pe: stat(weighted.rest.pe), pb: stat(weighted.rest.pb) };
+  }, [sc.data, weighted]);
 
   const cut = useMemo(() => {
     if (!sc.data) return 0;
@@ -255,6 +271,35 @@ export default function Valuation() {
           Weighted = total market cap ÷ total earnings (or equity) of profitable members, valued with filings published by each date. Excluding a group removes its stocks from every figure above (history included). Membership is current constituents, so history is survivorship-biased.
         </p>
       </section>
+
+      {/* before / after 2020 */}
+      {era && (era.pe.pre || era.pb.pre) && (
+        <section className="space-y-2 rounded-xl border border-slate-800 bg-slate-900 p-4">
+          <h2 className="text-sm font-semibold text-slate-100">Before 2020 vs 2020 – now (weighted, {excluded.length ? "after exclusions" : "all groups"})</h2>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[560px] text-sm tabular-nums">
+              <thead><tr><th>Measure</th><th className="text-right">Before 2020: average (range)</th><th className="text-right">2020 – now: average (range)</th><th className="text-right">Change in average</th><th className="text-right">Latest</th></tr></thead>
+              <tbody>
+                {([["Weighted P/E", era.pe], ["Weighted P/B", era.pb]] as const).map(([l, e]) => (
+                  <tr key={l} className="border-t border-slate-800">
+                    <td className="font-medium text-slate-100">{l}</td>
+                    <td className="text-right">{e.pre ? `${e.pre.mean.toFixed(2)} (${e.pre.min.toFixed(1)}–${e.pre.max.toFixed(1)})` : "–"}</td>
+                    <td className="text-right">{e.post ? `${e.post.mean.toFixed(2)} (${e.post.min.toFixed(1)}–${e.post.max.toFixed(1)})` : "–"}</td>
+                    <td className={`text-right font-medium ${e.pre && e.post ? (e.post.mean >= e.pre.mean ? "text-amber-600 dark:text-amber-300" : "text-sky-600 dark:text-sky-300") : ""}`}>
+                      {e.pre && e.post ? `${(((e.post.mean / e.pre.mean) - 1) * 100).toFixed(0)}%` : "–"}
+                    </td>
+                    <td className="text-right text-slate-100">{fmt(e.now, 2)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p className="text-xs text-slate-500">
+            Valuation history starts <b className="text-slate-300">{era.first}</b> (the earliest date with enough reports; trailing profit needs four quarters).
+            Earlier years use adjusted prices × today’s share count and only stocks listed today, so treat them as indicative.
+          </p>
+        </section>
+      )}
 
       {/* sector bars */}
       {bars && (
