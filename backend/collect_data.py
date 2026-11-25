@@ -1,3 +1,4 @@
+# backend/collect_data.py
 """Universe discovery + incremental OHLCV collection.
 
 Exit codes: 0 ok | 1 partial failures (data still usable, commit it) | 2 fatal (nothing usable, stop).
@@ -61,6 +62,27 @@ class SyncResult:
     status: str            # up_to_date | updated | unchanged | adjusted | empty | failed
     new_bars: int = 0
     error: str | None = None
+
+
+# ---------------------------------------------------------------- history-start marker
+def history_marker_path():
+    return C.DATA / "monitor" / "history_start.json"
+
+
+def needs_backfill() -> bool:
+    """True when START_DATE is earlier than the start the stored history was last fully downloaded from."""
+    m = read_json(history_marker_path(), {}) or {}
+    try:
+        return date.fromisoformat(m.get("prices_from", "9999-01-01")) > C.START_DATE
+    except ValueError:
+        return True
+
+
+def mark_backfilled() -> None:
+    m = read_json(history_marker_path(), {}) or {}
+    m["prices_from"] = C.START_DATE.isoformat()
+    m["prices_downloaded_utc"] = utc_now_iso()
+    write_if_changed(history_marker_path(), m)
 
 
 # ---------------------------------------------------------------- per-symbol sync
@@ -183,6 +205,10 @@ def main(argv: list[str] | None = None) -> int:
     args = ap.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s", stream=sys.stdout)
 
+    subset = {s.strip().upper() for s in args.symbols.split(",") if s.strip()}
+    if not subset and not args.full and not args.universe_only and needs_backfill():
+        logging.getLogger("collect").info("history start moved to %s -> one full re-download of all symbols", C.START_DATE)
+        args.full = True
     client, now = YuantaClient(), now_vn()
     failures: list[dict] = []
     try:
@@ -198,7 +224,6 @@ def main(argv: list[str] | None = None) -> int:
     if args.universe_only:
         return 0
 
-    subset = {s.strip().upper() for s in args.symbols.split(",") if s.strip()}
     index_codes = [i["code"] for i in uni["indexes"] if not subset or i["code"] in subset]
     equities = [s["symbol"] for s in uni["stocks"] if s["type"] in C.EQUITY_SYMBOL_TYPES and (not subset or s["symbol"] in subset)]
 
@@ -252,6 +277,8 @@ def main(argv: list[str] | None = None) -> int:
     if attempted and len(failures) / max(attempted, 1) > 0.2:
         log.error("failure rate too high: %d/%d", len(failures), attempted)
         return 1
+    if args.full and not subset and len(failures) <= 0.02 * max(attempted, 1):
+        mark_backfilled()          # do not repeat the big download on every run
     return 0
 
 
