@@ -3,6 +3,8 @@
 import { Loading, Page } from "@/components/Ui";
 import { Status, Validation, useJSON } from "@/lib/data";
 
+type HistCov = { requested_start: string; benchmark_first_bar: string | null; actual_start_year: Record<string, number | null>; prices_stocks: { symbols: number; earliest_date: string | null; reached_requested_start: number; first_year_counts: Record<string, number> }; fundamentals: { stocks: number; earliest_period_end: string | null } };
+type Era = { split: string; highlights: string[] };
 type FieldSamples = { samples: Record<string, { period: string; fields: Record<string, { matched: string | null; value: number | null; candidates: string[] }> }> };
 type Coverage = { fundamentals_files: number; stocks_valued: number; pe_valid_now: number; pb_valid_now: number; loss_making_now: number; stale_filing_now: number; latest_ttm_period: Record<string, number>; no_prices: { count: number; examples: string[] }; no_net_income: { count: number; examples: string[] }; no_equity: { count: number; examples: string[] }; no_shares: { count: number; examples: string[] }; no_ttm: { count: number; examples: string[] }; invalid_dates?: { count: number; examples: string[] } };
 
@@ -15,6 +17,8 @@ export default function Monitor() {
   const va = useJSON<Validation>("monitor/validation.json");
   const cov = useJSON<Coverage>("monitor/valuation_coverage.json");
   const fs = useJSON<FieldSamples>("monitor/field_samples.json");
+  const hc = useJSON<HistCov>("monitor/history_coverage.json");
+  const era = useJSON<Era>("monitor/era_comparison.json");
   const s = st.data;
   return (
     <Page title="Data monitoring">
@@ -43,6 +47,22 @@ export default function Monitor() {
               {([["invalid_dates", "Invalid report dates (run Fundamentals update with rebuild_only)"], ["no_ttm", "No TTM profit (needs 4 consecutive quarters)"], ["no_net_income", "No net profit line found"], ["no_equity", "No equity line found"], ["no_shares", "No share count (contributed capital) found"], ["no_prices", "No stored prices"]] as const).map(([k, l]) => (cov.data![k]?.count ?? 0) > 0 && (
                 <p key={k} className="text-xs text-slate-400"><b className="text-amber-600 dark:text-amber-300">{l}:</b> {cov.data![k]!.count} stocks, e.g. {cov.data![k]!.examples.join(", ")}</p>
               ))}
+            </section>
+          )}
+          {hc.data && (
+            <section>
+              <h2 className="mb-1 font-semibold">History coverage</h2>
+              <p className="text-sm text-slate-400">
+                Requested start <b className="text-slate-200">{hc.data.requested_start}</b>. Actual start: prices <b className="text-slate-200">{hc.data.actual_start_year.prices ?? "–"}</b> (VNINDEX {hc.data.benchmark_first_bar ?? "–"}),
+                statements <b className="text-slate-200">{hc.data.actual_start_year.statements ?? "–"}</b>, breadth <b className="text-slate-200">{hc.data.actual_start_year.breadth ?? "–"}</b>, valuation <b className="text-slate-200">{hc.data.actual_start_year.valuation ?? "–"}</b>.
+              </p>
+              <p className="text-xs text-slate-400">{hc.data.prices_stocks.reached_requested_start} of {hc.data.prices_stocks.symbols} stocks have prices back to the requested start. First price year per stock: {Object.entries(hc.data.prices_stocks.first_year_counts).map(([y, n]) => `${y}: ${n}`).join(" · ")}</p>
+            </section>
+          )}
+          {era.data && era.data.highlights.length > 0 && (
+            <section>
+              <h2 className="mb-1 font-semibold">Before vs after {era.data.split.slice(0, 4)} (generated from the data)</h2>
+              <ul className="list-disc space-y-1 pl-5 text-sm text-slate-300">{era.data.highlights.map((h, i) => <li key={i}>{h}</li>)}</ul>
             </section>
           )}
           {fs.data && Object.keys(fs.data.samples).length > 0 && (
