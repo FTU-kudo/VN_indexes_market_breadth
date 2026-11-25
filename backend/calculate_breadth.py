@@ -1,3 +1,4 @@
+# backend/calculate_breadth.py
 """Historical market breadth for the whole market, each exchange and every index with constituents.
 
 Method (all causal, no look-ahead):
@@ -179,7 +180,7 @@ def main(argv: list[str] | None = None) -> int:
         write_if_changed(C.DATA / "breadth" / f"{g['id']}.json", payload)
         last = df.iloc[-1]
         listing.append({"id": g["id"], "label": g["label"], "kind": g["kind"], "n_members": len(cols),
-                        "last_date": df.index[-1].strftime("%Y-%m-%d"),
+                        "first_date": df.index[0].strftime("%Y-%m-%d"), "last_date": df.index[-1].strftime("%Y-%m-%d"),
                         "composite": None if pd.isna(last["composite"]) else round(float(last["composite"]), 2),
                         "above_50_pct": None if pd.isna(last["above_50_pct"]) else round(float(last["above_50_pct"]), 2)})
     write_if_changed(C.DATA / "breadth" / "index.json", {"groups": listing, "membership_basis": BASIS_CURRENT})
