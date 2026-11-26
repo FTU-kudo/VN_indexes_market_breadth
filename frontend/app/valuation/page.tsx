@@ -18,6 +18,7 @@ const RANGES: [string, number | "ytd"][] = [["All", 1e9], ["10Y", 2520], ["5Y", 
 const METRICS = [["wpe", "Weighted P/E"], ["wpb", "Weighted P/B"], ["mpe", "Median P/E"], ["mpb", "Median P/B"]] as const;
 type Metric = (typeof METRICS)[number][0];
 const TOTAL = "__total__";
+const MIN_COVERAGE = 0.3;
 const PALETTE = ["#38bdf8", "#f59e0b", "#34d399", "#f43f5e", "#a78bfa", "#fb923c", "#2dd4bf", "#e879f9", "#84cc16", "#60a5fa", "#fbbf24", "#f472b6", "#4ade80", "#c084fc", "#22d3ee", "#fca5a1"];
 
 /* ---------------------------------------------------------------- helpers */
@@ -100,12 +101,15 @@ export default function Valuation() {
   const weighted = useMemo(() => {
     if (!sc.data) return null;
     const n = sc.data.dates.length, P = sc.data.parts;
+    const hasPx = groups.some((g) => P[g].n_px);          // older files without n_px are shown ungated
     const calc = (inc: (g: string) => boolean) => {
       const pe: (number | null)[] = [], pb: (number | null)[] = [], npe: number[] = [], npb: number[] = [];
       for (let i = 0; i < n; i++) {
-        let a = 0, b = 0, c = 0, d = 0, x = 0, y = 0;
-        for (const g of groups) if (inc(g)) { const p = P[g]; a += p.mcap_pe[i] ?? 0; b += p.ni[i] ?? 0; c += p.mcap_pb[i] ?? 0; d += p.eq[i] ?? 0; x += p.n_pe[i] ?? 0; y += p.n_pb[i] ?? 0; }
-        pe.push(ratio(a, b)); pb.push(ratio(c, d)); npe.push(x); npb.push(y);
+        let a = 0, b = 0, c = 0, d = 0, x = 0, y = 0, z = 0;
+        for (const g of groups) if (inc(g)) { const p = P[g]; a += p.mcap_pe[i] ?? 0; b += p.ni[i] ?? 0; c += p.mcap_pb[i] ?? 0; d += p.eq[i] ?? 0; x += p.n_pe[i] ?? 0; y += p.n_pb[i] ?? 0; z += p.n_px?.[i] ?? 0; }
+        // coverage gate (same rule as the data pipeline): enough of the stocks that traded must have a valid value
+        const okPe = !hasPx || (x >= 5 && x >= MIN_COVERAGE * z), okPb = !hasPx || (y >= 5 && y >= MIN_COVERAGE * z);
+        pe.push(okPe ? ratio(a, b) : null); pb.push(okPb ? ratio(c, d) : null); npe.push(x); npb.push(y);
       }
       return { pe, pb, npe, npb };
     };
@@ -124,7 +128,8 @@ export default function Valuation() {
       const now = [...arr].reverse().find((v) => v !== null) ?? null;
       return { pre: f(pre), post: f(post), now };
     };
-    return { first: dates[0], pe: stat(weighted.rest.pe), pb: stat(weighted.rest.pb) };
+    const firstOk = dates.find((_, i) => weighted.rest.pe[i] !== null || weighted.rest.pb[i] !== null) ?? dates[0];
+    return { first: firstOk, pe: stat(weighted.rest.pe), pb: stat(weighted.rest.pb) };
   }, [sc.data, weighted]);
 
   const cut = useMemo(() => {
@@ -295,7 +300,7 @@ export default function Valuation() {
             </table>
           </div>
           <p className="text-xs text-slate-500">
-            Valuation history starts <b className="text-slate-300">{era.first}</b> (the earliest date with enough reports; trailing profit needs four quarters).
+            Valuation history starts <b className="text-slate-300">{era.first}</b> (the earliest date on which at least 30% of the traded stocks have four quarters of reports).
             Earlier years use adjusted prices × today’s share count and only stocks listed today, so treat them as indicative.
           </p>
         </section>
