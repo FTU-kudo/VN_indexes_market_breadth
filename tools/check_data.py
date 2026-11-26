@@ -71,6 +71,16 @@ def main() -> int:
             pe = f"{r['pe']:.2f}" if r and r.get("pe") is not None else "-"
             pb = f"{r['pb']:.2f}" if r and r.get("pb") is not None else "-"
             print(f"{s:6} {last:14} {len(qs):<9} {pe:>8} {pb:>8}  {r['group'] if r else ''}")
+    hc = load(DATA / "monitor" / "history_coverage.json")
+    if hc:
+        a = hc["actual_start_year"]
+        print(f"\nhistory: requested start {hc['requested_start']}; prices {a['prices']}, statements {a['statements']}, valuation (whole market) {a['valuation']} "
+              f"[market {hc.get('valuation_start_market')}, HOSE {hc.get('valuation_start_hose')}]")
+        fy = hc["fundamentals"].get("first_year_counts", {})
+        late = sum(n for y, n in fy.items() if int(y) > int(hc["requested_start"][:4]) + 3)
+        if fy and late > 0.5 * sum(fy.values()):
+            print(f"WARNING: {late} of {sum(fy.values())} stocks have statements that start after {int(hc['requested_start'][:4]) + 3}: "
+                  "run 'Fundamentals update' with full ticked to download the older reports.")
     samples = (load(DATA / "monitor" / "field_samples.json") or {}).get("samples", {})
     if samples:
         print("\nfield matching (sample stocks):")
