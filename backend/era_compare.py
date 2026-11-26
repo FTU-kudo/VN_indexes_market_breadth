@@ -75,9 +75,11 @@ def build() -> dict:
         if df is None:
             continue
         out["valuation"][scope] = {}
-        for key in ("agg_pe", "agg_pb", "median_pe", "median_pb", "pct_loss"):
+        valid = df["agg_pe"].notna() if "agg_pe" in df else None            # coverage counts only on days that pass the gate
+        for key in ("agg_pe", "agg_pb", "median_pe", "median_pb", "pct_loss", "n_pe"):
             if key in df:
-                pre, post = _split(df[[key]])
+                col = df[[key]] if key != "n_pe" or valid is None else df[[key]].where(valid)
+                pre, post = _split(col)
                 out["valuation"][scope][key] = {"pre": _stats(pre[key]), "post": _stats(post[key]), "latest": round(float(df[key].dropna().iloc[-1]), 2) if df[key].notna().any() else None}
     out["highlights"] = highlights(out)
     return out
@@ -123,6 +125,17 @@ def highlights(r: dict) -> list[str]:
         h.append(f"Stocks with prices at the end of each era: {a['stocks_with_prices_at_end']} vs {b['stocks_with_prices_at_end']}; "
                  "earlier years contain only stocks that survive today (stronger survivorship bias).")
     for scope, d in (r.get("valuation") or {}).items():
+        n = d.get("n_pe") or {}
+        if n.get("pre") and n.get("post"):
+            h.append(f"{scope} valuation rests on {n['pre']['mean']:.0f} stocks per day on average before {C.ERA_SPLIT.year} vs {n['post']['mean']:.0f} since"
+                     f" (first valid date {n['pre']['first']}); days with too few valid stocks are left out.")
+        vb = (r.get("vnindex") or {}).get("pre") or {}
+        pe_pre = (d.get("agg_pe") or {}).get("pre")
+        if pe_pre and vb.get("first") and pe_pre["first"] > f"{int(vb['first'][:4]) + 2}-01-01":
+            h.append(f"{scope}: valuation before {C.ERA_SPLIT.year} only covers {pe_pre['first']} to {pe_pre['last']}, while prices go back to {vb['first']} "
+                     "— the before/after valuation comparison is limited to that window until older statements are loaded.")
+        if n.get("post") and not n.get("pre"):
+            h.append(f"{scope}: no valuation before {C.ERA_SPLIT.year} yet (statements do not reach back far enough); first valid date {n['post']['first']}.")
         for key, label in (("agg_pe", "weighted P/E"), ("agg_pb", "weighted P/B"), ("median_pe", "median P/E"), ("pct_loss", "loss-making share")):
             x = d.get(key)
             if x and x.get("pre") and x.get("post"):
