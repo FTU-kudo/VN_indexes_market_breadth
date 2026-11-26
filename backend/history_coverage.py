@@ -59,7 +59,8 @@ def build() -> dict:
         "fundamentals": {"stocks": sum(fq.values()), "earliest_period_end": earliest_q, "first_year_counts": dict(sorted(fq.items()))},
         "breadth_first_date": bscopes, "valuation_first_date": vscopes,
         "actual_start_year": {"prices": yr(stocks["earliest_date"]), "benchmark": yr(bench), "statements": yr(earliest_q),
-                              "breadth": yr(min((d for d in bscopes.values() if d), default=None)), "valuation": yr(vfirst)},
+                              "breadth": yr(min((d for d in bscopes.values() if d), default=None)), "valuation": yr(vscopes.get("MARKET") or vfirst)},
+        "valuation_start_market": vscopes.get("MARKET"), "valuation_start_hose": vscopes.get("HOSE"),
     }
 
 
