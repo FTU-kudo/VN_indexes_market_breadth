@@ -51,6 +51,7 @@ SAFE_NAME = r"^[A-Za-z0-9_.\-]{1,32}$"
 PRICE_UNIT_VND = 1000.0           # Yuanta history prices look like thousand VND (VIC 51.06); verify before trusting
 VALUATION_SHARES_MODE = "latest"  # "latest": adjusted prices x latest share count; "pit": raw prices x share count at filing
 MAX_FILING_AGE_DAYS = 400         # a filing older than this no longer feeds valuation (company stopped reporting)
+MIN_COVERAGE = 0.30             # a group statistic needs valid values for at least this share of the stocks that had a price that day
 STALE_FILING_DAYS = 150           # snapshot flag: latest filing is older than a normal quarterly cycle
 
 # ---- Fundamentals (Yuanta -> Vietstock financial statements) ----
