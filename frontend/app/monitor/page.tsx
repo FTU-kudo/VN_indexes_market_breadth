@@ -3,10 +3,10 @@
 import { Loading, Page } from "@/components/Ui";
 import { Status, Validation, useJSON } from "@/lib/data";
 
-type HistCov = { requested_start: string; benchmark_first_bar: string | null; actual_start_year: Record<string, number | null>; prices_stocks: { symbols: number; earliest_date: string | null; reached_requested_start: number; first_year_counts: Record<string, number> }; fundamentals: { stocks: number; earliest_period_end: string | null } };
+type HistCov = { valuation_start_market?: string | null; valuation_start_hose?: string | null; requested_start: string; benchmark_first_bar: string | null; actual_start_year: Record<string, number | null>; prices_stocks: { symbols: number; earliest_date: string | null; reached_requested_start: number; first_year_counts: Record<string, number> }; fundamentals: { stocks: number; earliest_period_end: string | null; first_year_counts?: Record<string, number> } };
 type Era = { split: string; highlights: string[] };
 type FieldSamples = { samples: Record<string, { period: string; fields: Record<string, { matched: string | null; value: number | null; candidates: string[] }> }> };
-type Coverage = { fundamentals_files: number; stocks_valued: number; pe_valid_now: number; pb_valid_now: number; loss_making_now: number; stale_filing_now: number; latest_ttm_period: Record<string, number>; no_prices: { count: number; examples: string[] }; no_net_income: { count: number; examples: string[] }; no_equity: { count: number; examples: string[] }; no_shares: { count: number; examples: string[] }; no_ttm: { count: number; examples: string[] }; invalid_dates?: { count: number; examples: string[] } };
+type Coverage = { fundamentals_files: number; stocks_valued: number; pe_valid_now: number; pb_valid_now: number; loss_making_now: number; stale_filing_now: number; latest_ttm_period: Record<string, number>; no_prices: { count: number; examples: string[] }; no_net_income: { count: number; examples: string[] }; no_equity: { count: number; examples: string[] }; no_shares: { count: number; examples: string[] }; no_ttm: { count: number; examples: string[] }; invalid_dates?: { count: number; examples: string[] }; ttm_diagnosis?: Record<string, { count: number; examples: string[] }> };
 
 const Card = ({ l, v }: { l: string; v: React.ReactNode }) => (
   <div className="rounded-xl border border-slate-800 bg-slate-900 p-3"><div className="text-xs text-slate-400">{l}</div><div className="text-lg font-semibold">{v ?? "–"}</div></div>
@@ -44,6 +44,9 @@ export default function Monitor() {
                 <Card l="Loss-making now" v={cov.data.loss_making_now} />
               </div>
               <p className="mt-2 text-xs text-slate-400">Latest period with 4 consecutive quarters of profit (stocks per period): {Object.entries(cov.data.latest_ttm_period).map(([k, n]) => `${k}: ${n}`).join(" · ") || "none"}</p>
+              {Object.entries(cov.data.ttm_diagnosis ?? {}).map(([k, v]) => (
+                <p key={k} className="text-xs text-slate-400"><b className="text-amber-600 dark:text-amber-300">Why no TTM — {k.replace(/_/g, " ")}:</b> {v.count} stocks, e.g. {v.examples.join(" | ")}</p>
+              ))}
               {([["invalid_dates", "Invalid report dates (run Fundamentals update with rebuild_only)"], ["no_ttm", "No TTM profit (needs 4 consecutive quarters)"], ["no_net_income", "No net profit line found"], ["no_equity", "No equity line found"], ["no_shares", "No share count (contributed capital) found"], ["no_prices", "No stored prices"]] as const).map(([k, l]) => (cov.data![k]?.count ?? 0) > 0 && (
                 <p key={k} className="text-xs text-slate-400"><b className="text-amber-600 dark:text-amber-300">{l}:</b> {cov.data![k]!.count} stocks, e.g. {cov.data![k]!.examples.join(", ")}</p>
               ))}
@@ -56,6 +59,7 @@ export default function Monitor() {
                 Requested start <b className="text-slate-200">{hc.data.requested_start}</b>. Actual start: prices <b className="text-slate-200">{hc.data.actual_start_year.prices ?? "–"}</b> (VNINDEX {hc.data.benchmark_first_bar ?? "–"}),
                 statements <b className="text-slate-200">{hc.data.actual_start_year.statements ?? "–"}</b>, breadth <b className="text-slate-200">{hc.data.actual_start_year.breadth ?? "–"}</b>, valuation <b className="text-slate-200">{hc.data.actual_start_year.valuation ?? "–"}</b>.
               </p>
+              <p className="text-xs text-slate-400">Valuation starts: whole market <b className="text-slate-200">{hc.data.valuation_start_market ?? "–"}</b>, HOSE <b className="text-slate-200">{hc.data.valuation_start_hose ?? "–"}</b>. Statements: first report year per stock — {Object.entries(hc.data.fundamentals.first_year_counts ?? {}).map(([y, n]) => `${y}: ${n}`).join(" · ") || "–"}</p>
               <p className="text-xs text-slate-400">{hc.data.prices_stocks.reached_requested_start} of {hc.data.prices_stocks.symbols} stocks have prices back to the requested start. First price year per stock: {Object.entries(hc.data.prices_stocks.first_year_counts).map(([y, n]) => `${y}: ${n}`).join(" · ")}</p>
             </section>
           )}
