@@ -72,3 +72,18 @@ def test_generated_sentences_handle_negative_values_and_drawdowns():
     assert "lower (-10.0 pts)" in _line("x", 5.0, -5.0, "%", 1, 15.0)
     assert "shallower" in _line("Deepest drawdown", 70.2, 48.3, "%", 1, 15.0, ("deeper", "shallower"))
     assert "about the same" in _line("x", 10.0, 10.5, "x", 1, 10.0)
+
+
+def test_era_comparison_warns_when_valuation_window_is_short(data_dir):
+    save_prices("indexes", "VNINDEX", pd.concat([_px("2010-01-04", "2019-12-31", seed=2), _px("2020-01-02", "2026-11-20", seed=3)]))
+    idx = pd.bdate_range("2010-01-04", "2026-11-20")
+    ok = [d >= pd.Timestamp("2019-02-01") for d in idx]          # statements only reach back to 2018 -> valuation passes the gate from 2019-02
+    pe = [15.0 if k else None for k in ok]
+    write_if_changed(data_dir / "valuation" / "HOSE.json", {"dates": [d.strftime("%Y-%m-%d") for d in idx], "series": {
+        "agg_pe": pe, "agg_pb": [1.5 if k else None for k in ok], "median_pe": pe, "median_pb": [1.4 if k else None for k in ok],
+        "pct_loss": [10.0 if k else None for k in ok], "n_pe": [40 if k else 3 for k in ok]}})
+    r = era_build()
+    assert r["valuation"]["HOSE"]["agg_pe"]["pre"]["first"] == "2019-02-01"
+    assert r["valuation"]["HOSE"]["n_pe"]["pre"]["mean"] == 40.0            # the 3-stock days before the gate do not drag the count down
+    text = " ".join(r["highlights"])
+    assert "valuation before 2020 only covers 2019-02-01 to 2019-12-31" in text and "limited to that window" in text
