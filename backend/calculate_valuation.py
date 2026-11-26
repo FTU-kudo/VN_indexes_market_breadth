@@ -20,10 +20,10 @@ from . import config as C
 from .calculate_breadth import build_groups
 from .classification import load_classification
 from .store import load_prices, read_json, series_list, write_if_changed
-from .valuation import aggregate_group, partition_components, prepare_fundamentals, valuation_for_symbol
+from .valuation import aggregate_group, partition_components, prepare_fundamentals, profit_run_stats, valuation_for_symbol
 
 log = logging.getLogger("valuation")
-PART_DECIMALS = {"n_pe": 0, "n_pb": 0, "mcap_pe": 3, "ni": 3, "mcap_pb": 3, "eq": 3, "med_pe": 2, "med_pb": 2}
+PART_DECIMALS = {"n_pe": 0, "n_pb": 0, "n_px": 0, "mcap_pe": 3, "ni": 3, "mcap_pb": 3, "eq": 3, "med_pe": 2, "med_pb": 2}
 
 
 def main() -> int:
@@ -48,6 +48,7 @@ def main() -> int:
     snap = []
     cov = {"no_prices": [], "no_net_income": [], "no_equity": [], "no_shares": [], "no_ttm": [], "invalid_dates": []}
     last_ni_period: Counter = Counter()
+    diag: dict[str, list[str]] = {}
     for fp in files:
         j = read_json(fp)
         sym = (j or {}).get("symbol")
@@ -72,6 +73,9 @@ def main() -> int:
             last_ni_period[f"{pe_end.year}Q{(pe_end.month - 1) // 3 + 1}"] += 1
         else:
             cov["no_ttm"].append(sym)
+            st = profit_run_stats(qs)
+            kind = ("never_a_profit_line" if st["n_profit_quarters"] == 0 else "fewer_than_4_profit_quarters" if st["n_profit_quarters"] < 4 else "gaps_no_4_consecutive")
+            diag.setdefault(kind, []).append(f"{sym}: {st['n_profit_quarters']} of {st['n_quarters']} quarters have a profit line, longest run {st['longest_run']}, last {st['last_profit_quarter']}")
         v = valuation_for_symbol(px["c"], f)
         if v.empty:
             continue
@@ -91,11 +95,13 @@ def main() -> int:
         return 0
     M = {k: pd.DataFrame({s: v[k].astype("float64") for s, v in frames.items()}).reindex(master)
          for k in ("mcap", "ni_ttm", "equity", "pe", "pb")}
+    M["has_px"] = pd.DataFrame({s: v["price"].astype("float64") for s, v in frames.items()}).reindex(master).notna().astype("float64")
     now = pd.DataFrame(snap)
     coverage = {"fundamentals_files": len(files), "stocks_valued": len(frames),
                 "latest_ttm_period": dict(sorted(last_ni_period.items())),
                 "pe_valid_now": int(now["pe"].notna().sum()), "pb_valid_now": int(now["pb"].notna().sum()),
                 "loss_making_now": int(now["loss"].fillna(False).sum()), "stale_filing_now": int(now["stale"].sum()),
+                "ttm_diagnosis": {k: {"count": len(v), "examples": sorted(v)[:8]} for k, v in sorted(diag.items())},
                 **{k: {"count": len(v), "examples": sorted(v)[:15]} for k, v in cov.items()}}
     write_if_changed(C.DATA / "monitor" / "valuation_coverage.json", coverage)
     log.info("coverage: valid P/E %d, valid P/B %d of %d stocks; latest TTM period %s", coverage["pe_valid_now"], coverage["pb_valid_now"],
@@ -113,7 +119,7 @@ def main() -> int:
         if len(cols) < C.MIN_GROUP_SIZE:
             continue
         df = aggregate_group(M, cols)
-        df = df[df["n_pe"] + df["n_pb"] > 0]
+        df = df[df[["agg_pe", "agg_pb", "median_pe", "median_pb"]].notna().any(axis=1)]   # only dates that pass the coverage gate
         if df.empty:
             continue
         parts = {name: p.reindex(df.index) for name, p in partition_components(M, cols, group_of).items()}
