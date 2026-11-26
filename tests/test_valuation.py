@@ -1,3 +1,4 @@
+# tests/test_valuation.py
 import numpy as np
 import pandas as pd
 import pytest
@@ -104,3 +105,30 @@ def test_partition_is_additive_and_matches_weighted_aggregate():
     assert np.allclose(sum(p["mcap_pe"] for p in inc) / sum(p["ni"] for p in inc), ex["agg_pe"])
     assert np.allclose(sum(p["n_pe"] for p in inc), ((M["ni_ttm"][rest] > 0)).sum(axis=1))
     assert np.allclose(parts["Banking"]["med_pe"], M["pe"][[c for c in cols if group_of[c] == "Banking"]].median(axis=1), equal_nan=True)
+
+
+def test_coverage_gate_hides_thin_samples():
+    import numpy as np
+    d = pd.to_datetime(["2015-06-01", "2025-06-01"])
+    cols = [f"S{i:02d}" for i in range(20)]
+    mcap = pd.DataFrame(1e12, index=d, columns=cols)
+    ni = pd.DataFrame(np.nan, index=d, columns=cols)
+    ni.iloc[0, :6] = 1e11                      # 2015: only 6 of 20 traded stocks have profit data (30% needed -> 6 is exactly enough)
+    ni.iloc[0, 5] = np.nan                     # ... make it 5 of 20 = 25%: below the gate
+    ni.iloc[1, :] = 1e11                       # 2025: everyone
+    M = {"mcap": mcap, "ni_ttm": ni, "equity": ni * 10, "pe": (mcap / ni).where(ni > 0), "pb": (mcap / (ni * 10)).where(ni > 0), "has_px": pd.DataFrame(1.0, index=d, columns=cols)}
+    g = aggregate_group(M, cols, min_n=5, min_cov=0.30)
+    assert np.isnan(g["agg_pe"].iloc[0]) and np.isnan(g["median_pe"].iloc[0]) and np.isnan(g["pct_loss"].iloc[0])   # 25% < 30%
+    assert g["n_pe"].iloc[0] == 5 and g["n_px"].iloc[0] == 20                                                       # counts still reported
+    assert g["agg_pe"].iloc[1] == 10.0 and g["median_pe"].iloc[1] == 10.0
+    assert aggregate_group({k: v for k, v in M.items() if k != "has_px"}, cols, min_n=5)["agg_pe"].notna().all()   # old behaviour without has_px
+
+
+def test_profit_run_stats_explains_missing_ttm():
+    from backend.valuation import profit_run_stats
+    q = lambda e, v: {"period_end": e, "net_income_parent": v}   # noqa: E731
+    none = profit_run_stats([q("2024-03-31", None), q("2024-06-30", None)])
+    assert none["n_profit_quarters"] == 0 and none["last_profit_quarter"] is None
+    gaps = profit_run_stats([q("2024-03-31", 1), q("2024-06-30", 1), q("2024-12-31", 1), q("2025-03-31", 1), q("2025-09-30", 1)])
+    assert gaps["n_profit_quarters"] == 5 and gaps["longest_run"] == 2 and gaps["last_profit_quarter"] == "2025Q3"   # 5 quarters but never 4 in a row
+    assert profit_run_stats([q(f"2025-{m:02d}-28", 1) for m in (3, 6, 9, 12)])["longest_run"] == 4
