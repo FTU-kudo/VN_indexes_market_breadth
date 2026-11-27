@@ -345,8 +345,20 @@ export default function Overview() {
       </div>
       </div>
 
-      <div className="rounded-lg border border-slate-800 bg-slate-900/60 px-3.5 py-2 text-xs text-slate-400">
-        <ChevronUp className="inline h-3 w-3 align-[-1px]" /> / <ChevronDown className="inline h-3 w-3 align-[-1px]" /> = close above / below that SMA (hover for distance). Trend counts SMAs below the close. Volume bars are relative to the largest value in view. Click a row to chart it.
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-800 bg-slate-950/90 px-3.5 py-2 text-xs text-slate-400">
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5">
+          <span className="inline-flex items-center gap-1.5">
+            <span className="font-semibold text-emerald-600 dark:text-emerald-400" aria-hidden>▲</span>
+            <span className="text-slate-500">/</span>
+            <span className="font-semibold text-rose-600 dark:text-rose-400" aria-hidden>▼</span>
+            <span><b className="font-semibold text-slate-200">Close above / below SMA</b> <span className="text-slate-500">(hover value for % distance)</span></span>
+          </span>
+          <span><b className="font-semibold text-slate-200">Trend</b> = count of SMAs below close</span>
+          <span><b className="font-semibold text-slate-200">Volume bar</b> = scaled relative to max volume in current view</span>
+        </div>
+        <span className="rounded-md border border-blue-200/70 bg-blue-50 px-2.5 py-0.5 font-medium text-blue-700 dark:border-blue-800/80 dark:bg-blue-950/60 dark:text-blue-300">
+          Click any row to update chart
+        </span>
       </div>
 
       {hist.data ? <LineChart title={`${sel} – close & moving averages (last ~500 sessions)`} series={series} height={360} />
