@@ -17,8 +17,8 @@ export const chartOptions = (height: number, dark = true) => ({
 
 const NO_LINES: { value: number; color?: string }[] = [];
 
-export default function LineChart({ series, height = 260, hlines = NO_LINES, title, actions }: {
-  series: Ser[]; height?: number; hlines?: { value: number; color?: string }[]; title?: string; actions?: ReactNode;
+export default function LineChart({ series, height = 260, hlines = NO_LINES, title, actions, yBounds }: {
+  series: Ser[]; height?: number; hlines?: { value: number; color?: string }[]; title?: string; actions?: ReactNode; yBounds?: { min?: number; max?: number };
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const seriesRefs = useRef<Map<string, ISeriesApi<"Line" | "Histogram">>>(new Map());
@@ -49,7 +49,7 @@ export default function LineChart({ series, height = 260, hlines = NO_LINES, tit
     chart.timeScale().fitContent();
     return () => { seriesRefs.current.clear(); chart.remove(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [series, height, hlines, theme]);
+  }, [series, height, hlines, theme, yBounds]);
 
   useEffect(() => {
     seriesRefs.current.forEach((api, name) => {

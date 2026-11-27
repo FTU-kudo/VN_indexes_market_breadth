@@ -77,7 +77,7 @@ export default function BreadthPage() {
               </div>
             ))}
           </div>
-          <LineChart title="% of stocks above moving average" series={s.ma} hlines={lines50} />
+          <LineChart title="% of stocks above moving average" series={s.ma} hlines={lines50} yBounds={{ min: 0, max: 100 }} />
           <div className="grid gap-4 lg:grid-cols-2">
             <LineChart title="Advance–Decline line (cumulative net advances)" series={s.ad} />
             <LineChart title="New highs vs new lows (count)" series={s.hl} actions={
@@ -86,8 +86,8 @@ export default function BreadthPage() {
             </select>
             } />
           </div>
-          <LineChart title={`Composite breadth score (Weights: ${Object.entries(b.data!.composite_weights).map(([k, v]) => `${k === "hl" ? "HI/LO" : k === "ad" ? "A/D" : k.toUpperCase()} ${Number(v).toFixed(2)}`).join(" · ")})`} series={s.score} hlines={lines3070} height={300} />
-          <LineChart title="Participation (% of stocks)" series={s.part} hlines={lines50} />
+          <LineChart title={`Composite breadth score (Weights: ${Object.entries(b.data!.composite_weights).map(([k, v]) => `${k === "hl" ? "HI/LO" : k === "ad" ? "A/D" : k.toUpperCase()} ${Number(v).toFixed(2)}`).join(" · ")})`} series={s.score} hlines={lines3070} height={300} yBounds={{ min: 0, max: 100 }} />
+          <LineChart title="Participation (% of stocks)" series={s.part} hlines={lines50} yBounds={{ min: 0, max: 100 }} />
         </>
       )}
     </Page>
