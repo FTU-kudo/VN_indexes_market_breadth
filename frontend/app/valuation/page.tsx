@@ -223,24 +223,24 @@ export default function Valuation() {
         </select>
 
         <div className="flex flex-wrap items-center gap-2">
-          <span className="inline-flex items-center gap-1.5 rounded-md bg-slate-900 px-3 py-1 text-xs font-semibold tabular-nums text-white dark:border dark:border-blue-800/80 dark:bg-blue-950/80 dark:text-blue-100">
+          <span className="inline-flex items-center gap-1.5 rounded-md border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-semibold tabular-nums text-blue-900 dark:border-blue-800/80 dark:bg-blue-950/80 dark:text-blue-100">
             <Calendar className="h-3.5 w-3.5 shrink-0 opacity-80" aria-hidden />
             Session: {asOf ?? "–"}
           </span>
 
-          <span className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-3 py-1 text-xs text-slate-600 shadow-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
+          <span className="inline-flex items-center gap-1.5 rounded-md border border-slate-700 bg-slate-900 px-3 py-1 text-xs text-slate-400 shadow-sm">
             <Database className="h-3.5 w-3.5 shrink-0 text-slate-400" aria-hidden />
-            Valid Coverage (<span className="font-bold tabular-nums text-slate-900 dark:text-slate-100">{rest.length}</span>):{" "}
-            <span className="font-bold tabular-nums text-slate-900 dark:text-slate-100">{w && last >= 0 ? w.npe[last] : "–"}</span> P/E ·{" "}
-            <span className="font-bold tabular-nums text-slate-900 dark:text-slate-100">{w && last >= 0 ? w.npb[last] : "–"}</span> P/B
+            Valid Coverage (<span className="font-bold tabular-nums text-slate-100">{rest.length}</span>):{" "}
+            <span className="font-bold tabular-nums text-slate-100">{w && last >= 0 ? w.npe[last] : "–"}</span> P/E ·{" "}
+            <span className="font-bold tabular-nums text-slate-100">{w && last >= 0 ? w.npb[last] : "–"}</span> P/B
           </span>
 
-          <span className="rounded-md border border-slate-200/80 bg-slate-100/90 px-2.5 py-1 text-xs font-medium text-slate-700 dark:border-slate-700 dark:bg-slate-800/90 dark:text-slate-300">
-            <span className="font-bold text-blue-700 dark:text-blue-400">P/E</span> = Close / TTM EPS
+          <span className="rounded-md border border-slate-700/80 bg-slate-950 px-2.5 py-1 text-xs font-medium text-slate-300">
+            <span className="font-bold text-blue-600 dark:text-blue-400">P/E</span> = Close / TTM EPS
           </span>
 
-          <span className="rounded-md border border-slate-200/80 bg-slate-100/90 px-2.5 py-1 text-xs font-medium text-slate-700 dark:border-slate-700 dark:bg-slate-800/90 dark:text-slate-300">
-            <span className="font-bold text-blue-700 dark:text-blue-400">P/B</span> = Close / BVPS
+          <span className="rounded-md border border-slate-700/80 bg-slate-950 px-2.5 py-1 text-xs font-medium text-slate-300">
+            <span className="font-bold text-blue-600 dark:text-blue-400">P/B</span> = Close / BVPS
           </span>
         </div>
       </div>
@@ -264,8 +264,8 @@ export default function Valuation() {
             key={l as string}
             className={`rounded-xl border border-slate-800 border-t-2 ${isWeighted ? "border-t-blue-600" : "border-t-emerald-500"} bg-slate-900 p-4 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md`}
           >
-            <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">{scopeId} {l as string}</div>
-            <div className="mt-1.5 text-3xl font-extrabold tracking-tight tabular-nums text-slate-900 dark:text-slate-100">{fmt(v as number | null, 2)}</div>
+            <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400">{scopeId} {l as string}</div>
+            <div className="mt-1.5 text-3xl font-extrabold tracking-tight tabular-nums text-slate-100">{fmt(v as number | null, 2)}</div>
             <div className="mt-1 text-xs text-slate-500">{n as string}{excluded.length ? ` · ${excluded.length} group(s) excluded` : ""}</div>
           </div>
         ))}
@@ -276,7 +276,7 @@ export default function Valuation() {
         const cards = syms.map((s) => stocks.find((r) => r.symbol === s)).filter((r): r is Stock => !!r);
         return cards.length > 0 && (
           <section key={name} className="rounded-xl border border-blue-200/70 bg-gradient-to-r from-blue-50/50 via-white to-indigo-50/40 p-4 dark:border-blue-900/60 dark:from-slate-900 dark:via-slate-900 dark:to-blue-950/30">
-            <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-900 dark:text-slate-100">
+            <h2 className="mb-3 flex items-center gap-2 text-base font-bold text-slate-100">
               {name}
               <span className="rounded-full bg-blue-600 px-2 py-0.5 text-[10px] font-semibold uppercase text-white">Special group</span>
             </h2>
@@ -285,15 +285,15 @@ export default function Valuation() {
                 <Link
                   key={c.symbol}
                   href={`/stock/${c.symbol}?view=fundamental`}
-                  className="rounded-lg border border-slate-200/90 bg-white/90 p-3 text-sm shadow-sm transition hover:border-blue-400 hover:shadow dark:border-slate-800 dark:bg-slate-900/90 dark:hover:border-sky-500"
+                  className="rounded-lg border border-slate-800 bg-slate-900/95 p-3 text-sm shadow-sm transition hover:border-blue-400 hover:shadow dark:hover:border-sky-500"
                 >
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-base font-bold text-slate-900 dark:text-sky-300">{c.symbol}</span>
-                    <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[11px] font-medium tabular-nums text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                    <span className="text-base font-extrabold text-slate-100">{c.symbol}</span>
+                    <span className="rounded-md border border-slate-700/80 bg-slate-950 px-2 py-0.5 text-xs font-semibold tabular-nums text-slate-200">
                       Close: {compactVnd(c.close_vnd)}
                     </span>
                   </div>
-                  <div className="mt-2 grid grid-cols-2 gap-2 border-t border-slate-100 pt-2 dark:border-slate-800">
+                  <div className="mt-2 grid grid-cols-2 gap-2 border-t border-slate-800 pt-2">
                     <div>
                       <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">P/E</div>
                       <div className={`text-sm font-bold tabular-nums ${peTone(c.pe)}`}>{fmt(c.pe, 2)}</div>
