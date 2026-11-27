@@ -126,17 +126,22 @@ export default function LineChart({ series, height = 260, hlines = NO_LINES, tit
 
   return (
     <div className="rounded-xl border border-slate-800 bg-slate-900 p-3 shadow-sm">
-      <div className="mb-2 flex flex-wrap items-center gap-2 text-xs">
-        {title && <span className="mr-1 font-bold text-slate-100">{title}</span>}
-        {hover ? (
-          <span className="rounded border border-blue-200 bg-blue-50 px-2 py-0.5 text-[11px] font-semibold tabular-nums text-blue-900 dark:border-blue-800/80 dark:bg-blue-950/80 dark:text-blue-100">
-            {hover.date}
-          </span>
-        ) : latest.date ? (
-          <span className="rounded border border-slate-700/80 bg-slate-950 px-2 py-0.5 text-[11px] font-medium tabular-nums text-slate-400">
-            Latest: {latest.date}
-          </span>
-        ) : null}
+      <div className="mb-1.5 flex items-center justify-between gap-2">
+        {title ? <span className="truncate text-xs font-bold text-slate-100">{title}</span> : <span />}
+        <div className="flex shrink-0 items-center gap-2">
+          {hover ? (
+            <span className="rounded border border-blue-200 bg-blue-50 px-2 py-0.5 text-[11px] font-semibold tabular-nums text-blue-900 dark:border-blue-800/80 dark:bg-blue-950/80 dark:text-blue-100">
+              {hover.date}
+            </span>
+          ) : latest.date ? (
+            <span className="rounded border border-slate-700/80 bg-slate-950 px-2 py-0.5 text-[11px] font-medium tabular-nums text-slate-400">
+              Latest: {latest.date}
+            </span>
+          ) : null}
+          {actions}
+        </div>
+      </div>
+      <div className="mb-2 flex min-h-[26px] flex-nowrap items-center gap-1.5 overflow-x-auto text-xs">
         {series.map((s) => {
           const isHidden = !!hidden[s.name];
           const val = activeVals[s.name];
@@ -147,7 +152,7 @@ export default function LineChart({ series, height = 260, hlines = NO_LINES, tit
               onClick={() => toggle(s.name)}
               aria-pressed={!isHidden}
               title="Click to show/hide"
-              className={`inline-flex cursor-pointer select-none items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs transition-all ${
+              className={`inline-flex shrink-0 cursor-pointer select-none items-center gap-1.5 whitespace-nowrap rounded-full border px-2.5 py-0.5 text-xs transition-all ${
                 isHidden
                   ? "border-slate-800 bg-slate-900 font-medium text-slate-500 line-through hover:border-slate-700 hover:text-slate-300"
                   : "border-slate-700 bg-slate-950 font-semibold text-slate-100 hover:border-slate-600"
@@ -161,7 +166,6 @@ export default function LineChart({ series, height = 260, hlines = NO_LINES, tit
             </button>
           );
         })}
-        {actions && <div className="ml-auto">{actions}</div>}
       </div>
       <div ref={ref} style={{ height }} />
     </div>
