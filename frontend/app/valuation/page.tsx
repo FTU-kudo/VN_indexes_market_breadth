@@ -3,6 +3,7 @@
 import { Calendar, Database, X } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import BulkSelectionControls from "@/components/BulkSelectionControls";
 import LineChart, { Ser } from "@/components/LineChart";
 import { useTheme } from "@/components/ThemeProvider";
 import { Loading, Page } from "@/components/Ui";
@@ -374,9 +375,14 @@ export default function Valuation() {
           <h2 className="text-sm font-semibold text-slate-100">Sector trend</h2>
           <div className="flex flex-wrap gap-2"><Seg value={metric} onChange={setMetric} options={METRICS.map(([v, l]) => [l, v] as [string, Metric])} /><Seg value={range} onChange={setRange} options={RANGES} /></div>
         </div>
-        <div className="flex flex-wrap gap-1.5">
-          <Chip on={false} onClick={() => setTrendSel([TOTAL, ...groups])}>Select all</Chip>
-          <Chip on={false} onClick={() => setTrendSel([])}>Deselect all</Chip>
+        <div className="flex flex-wrap items-center gap-1.5">
+          <BulkSelectionControls
+            onSelectAll={() => setTrendSel([TOTAL, ...groups])}
+            onDeselectAll={() => setTrendSel([])}
+            isAllSelected={trendSel.length >= groups.length + 1}
+            isNoneSelected={trendSel.length === 0}
+          />
+          <span className="mx-1 h-5 w-px bg-slate-700" aria-hidden />
           <Chip on={trendSel.includes(TOTAL)} onClick={() => setTrendSel((s) => (s.includes(TOTAL) ? s.filter((x) => x !== TOTAL) : [...s, TOTAL]))}>{scopeId} (all)</Chip>
           {groups.map((g) => <Chip key={g} on={trendSel.includes(g)} onClick={() => setTrendSel((s) => (s.includes(g) ? s.filter((x) => x !== g) : [...s, g]))}>{g}</Chip>)}
         </div>
