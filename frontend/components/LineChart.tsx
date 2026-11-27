@@ -1,3 +1,4 @@
+// frontend/components/LineChart.tsx
 "use client";
 import { ColorType, createChart, LineStyle } from "lightweight-charts";
 import { ReactNode, useEffect, useRef } from "react";
@@ -11,7 +12,7 @@ export const chartOptions = (height: number, dark = true) => ({
   localization: { locale: "en-US" }, // month names etc. in English regardless of the browser language
   layout: { background: { type: ColorType.Solid, color: "rgba(0,0,0,0)" }, textColor: dark ? "#949caa" : "#5b6578" },
   grid: { vertLines: { color: dark ? "#242934" : "#e9ecf2" }, horzLines: { color: dark ? "#242934" : "#e9ecf2" } },
-  rightPriceScale: { borderColor: dark ? "#333a47" : "#d6dbe3" }, timeScale: { borderColor: dark ? "#333a47" : "#d6dbe3" },
+  rightPriceScale: { borderColor: dark ? "#333a47" : "#d6dbe3" }, timeScale: { borderColor: dark ? "#333a47" : "#d6dbe3", minBarSpacing: 0.02 },   // default 0.5 px cannot fit 16 years of daily bars: only a slice was shown
 });
 
 const NO_LINES: { value: number; color?: string }[] = [];
@@ -26,7 +27,8 @@ export default function LineChart({ series, height = 260, hlines = NO_LINES, tit
     const chart = createChart(ref.current, chartOptions(height, theme === "dark"));
     if (series.some((s) => s.scale === "left")) chart.applyOptions({ leftPriceScale: { visible: true, borderColor: theme === "dark" ? "#333a47" : "#d6dbe3" } });
     series.forEach((s, idx) => {
-      const clean = s.data.filter((p) => p.value !== null).map((p) => ({ time: p.time, value: p.value as number, ...(p.color ? { color: p.color } : {}) }));
+      // missing values become whitespace so gaps stay gaps (nulls used to be dropped and the line was drawn straight across them)
+      const clean = s.data.map((p) => (p.value === null ? { time: p.time } : { time: p.time, value: p.value as number, ...(p.color ? { color: p.color } : {}) }));
       if (s.kind === "hist") {
         chart.addHistogramSeries({ color: s.color, priceFormat: { type: "price", precision: 2, minMove: 0.01 } }).setData(clean);
       } else {
