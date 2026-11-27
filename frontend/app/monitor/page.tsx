@@ -140,10 +140,24 @@ export default function Monitor() {
                 {Object.entries(cov.data.ttm_diagnosis ?? {}).map(([k, v]) => (
                   <details key={k} className="group rounded-lg border border-amber-200/80 bg-amber-50/70 px-3.5 py-2 text-xs dark:border-amber-800/60 dark:bg-amber-950/40">
                     <summary className="flex cursor-pointer list-none items-center justify-between font-semibold text-amber-900 dark:text-amber-200">
-                      <span>Why no TTM — {k.replace(/_/g, " ")} ({v.count} stocks)</span>
+                      <span>Why no TTM — {k.replace(/_/g, " ")} (<b className="font-bold tabular-nums text-amber-950 dark:text-amber-100">{v.count} stocks</b>)</span>
                       <ChevronDown className="h-4 w-4 shrink-0 transition-transform group-open:rotate-180" />
                     </summary>
-                    <p className="mt-2 leading-relaxed text-amber-800 dark:text-amber-300">{v.examples.join(" | ")}</p>
+                    <p className="mt-2 leading-relaxed text-amber-900/85 dark:text-amber-300">
+                      {v.examples.map((ex, i) => {
+                        const idx = ex.indexOf(":");
+                        return (
+                          <span key={i}>
+                            {i > 0 && <span className="mx-1.5 text-amber-400 dark:text-amber-600">|</span>}
+                            {idx > 0 ? (
+                              <><b className="font-bold tracking-tight text-amber-950 dark:text-amber-100">{ex.slice(0, idx)}</b>{ex.slice(idx)}</>
+                            ) : (
+                              <b className="font-bold text-amber-950 dark:text-amber-100">{ex}</b>
+                            )}
+                          </span>
+                        );
+                      })}
+                    </p>
                   </details>
                 ))}
 
@@ -157,10 +171,16 @@ export default function Monitor() {
                 ] as const).map(([k, l]) => (cov.data![k]?.count ?? 0) > 0 && (
                   <details key={k} className="group rounded-lg border border-amber-200/80 bg-amber-50/70 px-3.5 py-2 text-xs dark:border-amber-800/60 dark:bg-amber-950/40">
                     <summary className="flex cursor-pointer list-none items-center justify-between font-semibold text-amber-900 dark:text-amber-200">
-                      <span>{l} ({cov.data![k]!.count} stocks)</span>
+                      <span>{l} (<b className="font-bold tabular-nums text-amber-950 dark:text-amber-100">{cov.data![k]!.count} stocks</b>)</span>
                       <ChevronDown className="h-4 w-4 shrink-0 transition-transform group-open:rotate-180" />
                     </summary>
-                    <p className="mt-2 leading-relaxed text-amber-800 dark:text-amber-300">{cov.data![k]!.examples.join(", ")}</p>
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {cov.data![k]!.examples.map((sym) => (
+                        <span key={sym} className="rounded border border-amber-200/90 bg-white/90 px-1.5 py-0.5 text-[11px] font-bold text-amber-950 dark:border-amber-800/70 dark:bg-amber-950/70 dark:text-amber-100">
+                          {sym}
+                        </span>
+                      ))}
+                    </div>
                   </details>
                 ))}
               </div>
