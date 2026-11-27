@@ -72,7 +72,7 @@ function StatementTable({ stmt, report, count, filter }: { stmt: Stmt; report: s
 export default function FundamentalView({ sym }: { sym: string }) {
   const { theme } = useTheme();
   const dark = theme === "dark";
-  const [range, setRange] = useState(756);
+  const [range, setRange] = useState(1e9);
   const [tab, setTab] = useState("KQKD");
   const [count, setCount] = useState(8);
   const [filter, setFilter] = useState("");
