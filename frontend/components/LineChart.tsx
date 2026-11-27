@@ -29,6 +29,7 @@ export default function LineChart({ series, height = 260, hlines = NO_LINES, tit
     if (!ref.current) return;
     const chart = createChart(ref.current, chartOptions(height, theme === "dark"));
     const map = new Map<string, ISeriesApi<"Line" | "Histogram">>();
+    if (yBounds) chart.priceScale("right").applyOptions({ scaleMargins: { top: 0, bottom: 0 } });
     if (series.some((s) => s.scale === "left")) chart.applyOptions({ leftPriceScale: { visible: true, borderColor: theme === "dark" ? "#333a47" : "#d6dbe3" } });
     series.forEach((s, idx) => {
       // missing values become whitespace so gaps stay gaps (nulls used to be dropped and the line was drawn straight across them)
