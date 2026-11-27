@@ -84,12 +84,13 @@ function VolCell({ v, max }: { v: number | null; max: number }) {
 
 function RsiCell({ v }: { v: number | null }) {
   if (v === null) return <span className="text-slate-500">–</span>;
-  const [label, cls] = v < 30 ? ["Oversold", "bg-sky-500/15 text-sky-700 dark:text-sky-300"]
-    : v > 70 ? ["Overbought", "bg-amber-500/15 text-amber-700 dark:text-amber-300"] : ["Neutral", "bg-slate-500/10 text-slate-400"];
+  const [label, cls] = v < 30 ? ["Oversold", "border border-sky-200 bg-sky-50 text-sky-700 dark:border-sky-800 dark:bg-sky-950/60 dark:text-sky-300"]
+    : v > 70 ? ["Overbought", "border border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-950/60 dark:text-amber-300"]
+    : ["Neutral", "border border-slate-700/80 bg-slate-950 text-slate-400"];
   return (
     <span className="inline-flex items-center justify-end gap-2">
       <span className="text-slate-200">{v.toFixed(1)}</span>
-      <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide ${cls}`}>{label}</span>
+      <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${cls}`}>{label}</span>
     </span>
   );
 }
@@ -128,21 +129,29 @@ const COLS: Col[] = [
 ];
 
 /* ------------------------------------------------------------------ KPI card */
-function KpiCard({ row, name, onPick }: { row: Row; name: string; onPick: () => void }) {
+function KpiCard({ row, name, selected, onPick }: { row: Row; name: string; selected: boolean; onPick: () => void }) {
   const hist = useJSON<Columnar>(`indicators/indexes/${row.symbol}.json`);
   const vals = useMemo(() => (hist.data?.series.close ?? []).filter((v): v is number => v !== null).slice(-60), [hist.data]);
   const up = vals.length > 1 ? vals[vals.length - 1] >= vals[0] : (num(row, "ret_1") ?? 0) >= 0;
   return (
-    <button onClick={onPick} className="group rounded-xl border border-slate-800 bg-slate-900 p-4 text-left transition hover:border-slate-700">
+    <button
+      onClick={onPick}
+      aria-pressed={selected}
+      className={`group rounded-xl border p-4 text-left transition-all hover:border-blue-400/70 ${
+        selected
+          ? "border-blue-400 bg-blue-50/15 ring-2 ring-blue-500/30 dark:bg-blue-950/20"
+          : "border-slate-800 bg-slate-900"
+      }`}
+    >
       <div className="flex items-start justify-between">
         <div>
-          <div className="text-xs font-medium uppercase tracking-wide text-slate-400">{row.symbol}</div>
+          <div className="text-xs font-bold uppercase tracking-wider text-slate-300">{row.symbol}</div>
           {name !== row.symbol && <div className="text-xs text-slate-500">{name}</div>}
         </div>
       </div>
       <div className="mt-2 flex items-end justify-between gap-3">
         <div>
-          <div className="text-2xl font-semibold tabular-nums text-slate-100">{fmt(num(row, "close"))}</div>
+          <div className="text-2xl font-extrabold tracking-tight tabular-nums text-slate-100 sm:text-[26px]">{fmt(num(row, "close"))}</div>
           <ChgText r={row} className="mt-0.5 text-sm" />
         </div>
         <div className="w-28 shrink-0">
@@ -211,33 +220,49 @@ export default function Overview() {
   }, [hist.data, dark]);
 
   const Mover = ({ r }: { r: Row }) => (
-    <button onClick={() => setSel(r.symbol)} className="inline-flex items-center gap-1.5 rounded-full border border-slate-800 bg-slate-900 px-2.5 py-1 text-xs hover:border-slate-700">
-      <span className="font-medium text-slate-200">{r.symbol}</span><ChgText r={r} className="text-xs" />
+    <button onClick={() => setSel(r.symbol)} className="inline-flex cursor-pointer items-center gap-1.5 rounded-md px-2 py-1 text-xs transition-colors hover:bg-slate-950">
+      <span className="font-semibold text-slate-100">{r.symbol}</span><ChgText r={r} className="text-xs" />
     </button>
   );
 
   return (
     <Page title="Market overview">
-      <p className="-mt-2 text-sm text-slate-400">
-        Latest trading date <b className="font-semibold text-slate-200">{status.data?.latest_trading_date ?? "–"}</b> · {all.length} indexes · prices as of the last close
-      </p>
+      <div className="-mt-2 flex flex-wrap items-center gap-2">
+        <span className="inline-flex items-center rounded-md border border-blue-200/80 bg-blue-50 px-2.5 py-1 text-xs font-semibold tabular-nums text-blue-900 dark:border-blue-800/80 dark:bg-blue-950/80 dark:text-blue-100">
+          Session: {status.data?.latest_trading_date ?? "–"}
+        </span>
+        <span className="inline-flex items-center rounded-md border border-slate-700/80 bg-slate-950 px-2.5 py-1 text-xs font-medium tabular-nums text-slate-300">
+          Coverage: {all.length} indices · Last close
+        </span>
+      </div>
 
       {/* KPI bar */}
       <section aria-label="Key indices" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {snap.loading ? [0, 1, 2, 3].map((i) => <div key={i} className="h-[108px] animate-pulse rounded-xl border border-slate-800 bg-slate-900" />)
-          : kpis.map((r) => <KpiCard key={r.symbol} row={r} name={nameOf.get(r.symbol) ?? r.symbol} onPick={() => setSel(r.symbol)} />)}
+          : kpis.map((r) => <KpiCard key={r.symbol} row={r} name={nameOf.get(r.symbol) ?? r.symbol} selected={sel === r.symbol} onPick={() => setSel(r.symbol)} />)}
       </section>
 
       {/* Movers */}
       {(movers.gain.length > 0 || movers.lose.length > 0) && (
-        <section className="flex flex-wrap items-center gap-x-6 gap-y-2 text-xs text-slate-400" aria-label="Top movers">
-          {movers.gain.length > 0 && <div className="flex flex-wrap items-center gap-2"><span className="font-medium uppercase tracking-wide">Top gainers</span>{movers.gain.map((r) => <Mover key={r.symbol} r={r} />)}</div>}
-          {movers.lose.length > 0 && <div className="flex flex-wrap items-center gap-2"><span className="font-medium uppercase tracking-wide">Top losers</span>{movers.lose.map((r) => <Mover key={r.symbol} r={r} />)}</div>}
+        <section className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-800 bg-slate-900 px-4 py-2.5 shadow-sm" aria-label="Top movers">
+          {movers.gain.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="rounded bg-emerald-50 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300">Top gainers</span>
+              {movers.gain.map((r) => <Mover key={r.symbol} r={r} />)}
+            </div>
+          )}
+          {movers.lose.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="rounded bg-rose-50 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-rose-700 dark:bg-rose-950/60 dark:text-rose-300">Top losers</span>
+              {movers.lose.map((r) => <Mover key={r.symbol} r={r} />)}
+            </div>
+          )}
         </section>
       )}
 
-      {/* Controls */}
-      <div className="flex flex-wrap items-center gap-2">
+      {/* Controls + Table */}
+      <div className="overflow-hidden rounded-xl border border-slate-800 bg-slate-950 shadow-sm">
+        <div className="flex flex-wrap items-center gap-2 border-b border-slate-800 bg-slate-950/80 px-4 py-3">
         <div className="relative">
           <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
           <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search index…" aria-label="Search indexes" className="w-56 rounded-lg py-1.5 pl-8 pr-7" />
@@ -269,16 +294,16 @@ export default function Overview() {
       </div>
 
       {/* Table */}
-      <div className="overflow-x-auto rounded-xl border border-slate-800 bg-slate-950">
+      <div className="overflow-x-auto">
         <table className="w-full min-w-[860px] border-separate border-spacing-0 text-sm tabular-nums">
-          <thead>
+          <thead className="sticky top-0 z-10 bg-slate-900/95 backdrop-blur-sm">
             <tr>
-              <th scope="col" className="sticky left-0 top-0 z-20 border-b border-r border-slate-800 bg-slate-900 px-3 py-2.5 text-xs uppercase tracking-wide">Index</th>
+              <th scope="col" className="sticky left-0 top-0 z-20 border-b border-r border-slate-800 bg-slate-900 px-3 py-2.5 text-[11px] font-bold uppercase tracking-wider text-slate-400">Index</th>
               {cols.map((c) => {
                 const active = sort?.key === c.key;
                 return (
                   <th key={c.key} scope="col" aria-sort={active ? (sort!.dir === -1 ? "descending" : "ascending") : "none"}
-                    className="border-b border-slate-800 bg-slate-900 px-3 py-2.5 text-xs uppercase tracking-wide">
+                    className="border-b border-slate-800 bg-slate-900 px-3 py-2.5 text-[11px] font-bold uppercase tracking-wider text-slate-400">
                     <button onClick={() => toggleSort(c.key)} className={`inline-flex w-full items-center gap-1 hover:text-slate-100 ${c.center ? "justify-center" : "justify-end"} ${active ? "text-slate-100" : ""}`}>
                       {c.label}{active ? (sort!.dir === -1 ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronUp className="h-3.5 w-3.5" />) : <ArrowUpDown className="h-3 w-3 opacity-40" />}
                     </button>
@@ -293,12 +318,16 @@ export default function Overview() {
             ))}
             {rows.map((r) => {
               const name = nameOf.get(r.symbol) ?? r.symbol;
+              const isSelected = sel === r.symbol;
               return (
-                <tr key={r.symbol} onClick={() => setSel(r.symbol)} onKeyDown={(e) => e.key === "Enter" && setSel(r.symbol)} tabIndex={0} aria-selected={sel === r.symbol}
-                  className="cursor-pointer outline-none odd:bg-slate-950 even:bg-slate-900 hover:bg-slate-800 focus-visible:bg-slate-800">
-                  <td className="sticky left-0 z-10 border-r border-slate-800 bg-inherit px-3 py-2">
+                <tr key={r.symbol} onClick={() => setSel(r.symbol)} onKeyDown={(e) => e.key === "Enter" && setSel(r.symbol)} tabIndex={0} aria-selected={isSelected}
+                  className={`cursor-pointer outline-none transition-colors ${
+                    isSelected
+                      ? "bg-blue-50/60 dark:bg-blue-950/30"
+                      : "odd:bg-slate-950 even:bg-slate-900 hover:bg-slate-900/90 focus-visible:bg-slate-800"
+                  }`}>
+                  <td className={`sticky left-0 z-10 border-r border-slate-800 bg-inherit px-3 py-2 ${isSelected ? "border-l-4 border-l-blue-600" : ""}`}>
                     <div className="flex items-center gap-2">
-                      <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${sel === r.symbol ? "bg-sky-500" : "bg-transparent"}`} />
                       <div><div className="font-semibold text-slate-100">{r.symbol}</div>{name !== r.symbol && <div className="max-w-[10rem] truncate text-xs text-slate-500">{name}</div>}</div>
                     </div>
                   </td>
@@ -314,9 +343,11 @@ export default function Overview() {
           </tbody>
         </table>
       </div>
-      <p className="text-xs text-slate-500">
+      </div>
+
+      <div className="rounded-lg border border-slate-800 bg-slate-900/60 px-3.5 py-2 text-xs text-slate-400">
         <ChevronUp className="inline h-3 w-3 align-[-1px]" /> / <ChevronDown className="inline h-3 w-3 align-[-1px]" /> = close above / below that SMA (hover for distance). Trend counts SMAs below the close. Volume bars are relative to the largest value in view. Click a row to chart it.
-      </p>
+      </div>
 
       {hist.data ? <LineChart title={`${sel} – close & moving averages (last ~500 sessions)`} series={series} height={360} />
         : !hist.loading && <p className="text-sm text-slate-500">No history file for {sel}.</p>}
