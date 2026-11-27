@@ -45,7 +45,7 @@ NOT_PARENT = r"(?!.*(không kiểm soát|thiểu số|chưa phân phối|kỳ tr
 # (report type, ordered patterns). First pattern that matches any line wins.
 FIELDS: dict[str, tuple[str, list[re.Pattern]]] = {
     "net_income_parent": ("KQKD", _c(
-        r"^lợi nhuận sau thuế" + NOT_PARENT + r".*(công ty mẹ|ngân hàng mẹ|chủ sở hữu của công ty mẹ)",
+        r"lợi nhuận sau thuế" + NOT_PARENT + r".*(công ty mẹ|ngân hàng mẹ|chủ sở hữu của công ty mẹ)",
         r"^lợi nhuận (sau thuế )?(của )?cổ đông" + NOT_PARENT + r".*(mẹ)",
         r"^lợi nhuận sau thuế" + NOT_PARENT + r".*cổ đông",
         r"(profit|income|earnings).*after.*tax" + NOT_PARENT + r".*(parent|shareholders|owners|equity holders)",
@@ -67,6 +67,7 @@ NOT_PARENT_EN = r"(?!.*(non-?controlling|minority|undistributed|retained|per sha
 FIELDS_EN: dict[str, tuple[str, list[re.Pattern]]] = {
     "net_income_parent": ("KQKD", _c(
         r"(profit|income|earnings).*after.*tax" + NOT_PARENT_EN + r".*(parent|shareholders|owners|equity holders)",
+        r"(net )?(profit|income|earnings).*at+ributable to (the )?(owners|shareholders|equity holders).*(parent|bank|company)" + NOT_PARENT_EN,
         r"(parent).*(profit|income|earnings).*(after|net)" + NOT_PARENT_EN,
         r"attributable to (the )?(owners|shareholders|equity holders)" + NOT_PARENT_EN,
         r"^net (profit|income).*(parent)" + NOT_PARENT_EN)),

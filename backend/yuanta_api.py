@@ -132,7 +132,8 @@ def parse_history(payload: Any) -> list[dict]:
         if t is None or any(x is None or x <= 0 for x in vals) or vol is None or vol < 0:
             continue
         d = ts_to_date(t)
-        by_date[d] = {"date": d, "o": vals[0], "h": vals[1], "l": vals[2], "c": vals[3], "v": vol}
+        o, h, l, c = vals
+        by_date[d] = {"date": d, "o": o, "h": max(o, h, l, c), "l": min(o, h, l, c), "c": c, "v": vol}
     return [by_date[d] for d in sorted(by_date)]
 
 
