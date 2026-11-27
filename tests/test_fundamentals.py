@@ -319,3 +319,20 @@ def test_bank_equity_from_capital_and_reserves_or_balance_sheet_identity():
     # the identity is only a fallback: a real equity line always wins
     q, _ = build_quarters([kq, ta, tl, _row("CDKT", "VỐN CHỦ SỞ HỮU (400)", 90.0, 7, en="Owner's equity")])
     assert q[0]["equity_parent"] == 90.0 * C.FUND_UNIT
+
+
+def test_minority_interest_outside_equity_before_2015_is_not_subtracted_twice():
+    from backend.collect_fundamentals import build_quarters
+    kq = _row("KQKD", "Lợi nhuận sau thuế của cổ đông của công ty mẹ", 10.0, 1, en="Profit after tax for shareholders of parent company")
+    ta, tl = _row("CDKT", "TỔNG CỘNG TÀI SẢN", 1000.0, 2, en="TOTAL ASSETS"), _row("CDKT", "NỢ PHẢI TRẢ", 400.0, 3, en="LIABILITIES")
+    mi = _row("CDKT", "Lợi ích cổ đông thiểu số", 100.0, 5, en="Minority interests")
+    cc = _row("CDKT", "Vốn góp của chủ sở hữu", 200.0, 6, en="Contributed capital")
+    # old layout: assets 1000 = liabilities 400 + equity 500 + minority 100 -> the equity line already EXCLUDES minority
+    q, _ = build_quarters([kq, ta, tl, mi, cc, _row("CDKT", "VỐN CHỦ SỞ HỮU", 500.0, 4, en="Owner's equity")])
+    assert q[0]["equity_parent"] == 500.0 * C.FUND_UNIT
+    # new layout: assets 1000 = liabilities 400 + equity 600 (which INCLUDES minority 100) -> parent equity 500
+    q, _ = build_quarters([kq, ta, tl, mi, cc, _row("CDKT", "VỐN CHỦ SỞ HỮU", 600.0, 4, en="Owner's equity")])
+    assert q[0]["equity_parent"] == 500.0 * C.FUND_UNIT
+    # identity not testable (no totals) -> previous behaviour: subtract
+    q, _ = build_quarters([kq, mi, cc, _row("CDKT", "VỐN CHỦ SỞ HỮU", 600.0, 4, en="Owner's equity")])
+    assert q[0]["equity_parent"] == 500.0 * C.FUND_UNIT
