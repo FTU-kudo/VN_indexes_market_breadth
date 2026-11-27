@@ -35,19 +35,19 @@ export default function Clock() {
   const open = isMarketOpen(d);
   return (
     <div
-      className="flex items-center gap-2.5 whitespace-nowrap rounded-full border border-slate-200/80 bg-slate-50/90 px-3.5 py-1.5 shadow-sm dark:border-slate-700/80 dark:bg-slate-900/90"
+      className="flex items-center gap-2.5 whitespace-nowrap rounded-full border border-slate-700/80 bg-slate-950/90 px-3.5 py-1.5 shadow-sm"
       title={open ? "HOSE market session open · Vietnam time (GMT+7)" : "HOSE market closed · Vietnam time (GMT+7)"}
       aria-label="Current time in Vietnam"
     >
       <span className="relative flex h-2 w-2 shrink-0" aria-hidden>
         {open && <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />}
-        <span className={`relative inline-flex h-2 w-2 rounded-full ${open ? "bg-emerald-500" : "bg-slate-400 dark:bg-slate-500"}`} />
+        <span className={`relative inline-flex h-2 w-2 rounded-full ${open ? "bg-emerald-500" : "bg-slate-400"}`} />
       </span>
-      <span className="min-w-[4.25rem] text-xs font-semibold tabular-nums text-slate-900 dark:text-slate-100 sm:text-sm">
+      <span className="min-w-[4.25rem] text-xs font-bold tabular-nums text-slate-100 sm:text-sm">
         {d ? time.format(d) : "--:--:--"}
       </span>
-      <span className="hidden h-3.5 w-px bg-slate-200 dark:bg-slate-700 sm:block" aria-hidden />
-      <span className="hidden text-xs font-medium text-slate-500 dark:text-slate-400 sm:inline">
+      <span className="hidden h-3.5 w-px bg-slate-700 sm:block" aria-hidden />
+      <span className="hidden text-xs font-medium text-slate-400 sm:inline">
         {d ? date.format(d) : ""} · GMT+7
       </span>
     </div>
