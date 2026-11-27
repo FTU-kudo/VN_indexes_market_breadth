@@ -1,5 +1,6 @@
 // frontend/app/valuation/page.tsx
 "use client";
+import { Calendar, Database, X } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import LineChart, { Ser } from "@/components/LineChart";
@@ -52,9 +53,14 @@ function Bars({ title, note, items, color }: { title: string; note: string; item
 
 const Chip = ({ on, tone = "sky", onClick, children }: { on: boolean; tone?: "sky" | "rose"; onClick: () => void; children: React.ReactNode }) => (
   <button onClick={onClick} aria-pressed={on}
-    className={`rounded-full border px-2.5 py-1 text-xs transition ${on
-      ? tone === "rose" ? "border-rose-400 bg-rose-500/15 text-rose-700 line-through dark:text-rose-300" : "border-sky-500 bg-sky-500/15 text-sky-700 dark:text-sky-300"
-      : "border-slate-700 text-slate-400 hover:border-slate-600 hover:text-slate-200"}`}>{children}</button>
+    className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs transition ${on
+      ? tone === "rose"
+        ? "border-rose-300 bg-rose-50 text-rose-700 line-through decoration-rose-400 dark:border-rose-700 dark:bg-rose-950/40 dark:text-rose-300"
+        : "border-sky-500 bg-sky-500/15 text-sky-700 dark:text-sky-300"
+      : "border-slate-700 text-slate-400 hover:border-slate-600 hover:text-slate-200"}`}>
+    {on && tone === "rose" && <X className="h-3 w-3 shrink-0 no-underline" aria-hidden />}
+    {children}
+  </button>
 );
 const Seg = <T extends string | number>({ value, onChange, options }: { value: T; onChange: (v: T) => void; options: [string, T][] }) => (
   <div className="flex rounded-lg border border-slate-800 bg-slate-900 p-0.5 text-xs">
@@ -209,14 +215,34 @@ export default function Valuation() {
 
   return (
     <Page title="Valuation – P/E & P/B">
-      <div className="flex flex-wrap items-center gap-3 text-sm">
+      <div className="flex flex-wrap items-center gap-2.5 text-sm">
         <select value={scopeId} onChange={(e) => setScopeId(e.target.value)} aria-label="Market or index">
           {([["market", "All markets"], ["exchange", "Exchanges"], ["index", "Indexes"]] as const).map(([k, l]) => kind(k).length > 0 && (
             <optgroup key={k} label={l}>{kind(k).map((g) => <option key={g.id} value={g.id}>{g.id} ({g.n_members})</option>)}</optgroup>
           ))}
         </select>
-        <span className="text-slate-400">As of <b className="text-slate-200">{asOf ?? "–"}</b> · PE = Close / TTM EPS · PB = Close / BVPS · valid stocks{" "}
-          <b className="text-sky-600 dark:text-sky-400">{w && last >= 0 ? w.npe[last] : "–"} PE / {w && last >= 0 ? w.npb[last] : "–"} PB</b> out of {rest.length}</span>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="inline-flex items-center gap-1.5 rounded-md bg-slate-900 px-3 py-1 text-xs font-semibold tabular-nums text-white dark:border dark:border-blue-800/80 dark:bg-blue-950/80 dark:text-blue-100">
+            <Calendar className="h-3.5 w-3.5 shrink-0 opacity-80" aria-hidden />
+            Session: {asOf ?? "–"}
+          </span>
+
+          <span className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-3 py-1 text-xs text-slate-600 shadow-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
+            <Database className="h-3.5 w-3.5 shrink-0 text-slate-400" aria-hidden />
+            Valid Coverage (<span className="font-bold tabular-nums text-slate-900 dark:text-slate-100">{rest.length}</span>):{" "}
+            <span className="font-bold tabular-nums text-slate-900 dark:text-slate-100">{w && last >= 0 ? w.npe[last] : "–"}</span> P/E ·{" "}
+            <span className="font-bold tabular-nums text-slate-900 dark:text-slate-100">{w && last >= 0 ? w.npb[last] : "–"}</span> P/B
+          </span>
+
+          <span className="rounded-md border border-slate-200/80 bg-slate-100/90 px-2.5 py-1 text-xs font-medium text-slate-700 dark:border-slate-700 dark:bg-slate-800/90 dark:text-slate-300">
+            <span className="font-bold text-blue-700 dark:text-blue-400">P/E</span> = Close / TTM EPS
+          </span>
+
+          <span className="rounded-md border border-slate-200/80 bg-slate-100/90 px-2.5 py-1 text-xs font-medium text-slate-700 dark:border-slate-700 dark:bg-slate-800/90 dark:text-slate-300">
+            <span className="font-bold text-blue-700 dark:text-blue-400">P/B</span> = Close / BVPS
+          </span>
+        </div>
       </div>
 
       {asOf && w && last >= 0 && (Date.now() - Date.parse(asOf) > 45 * 864e5 || w.npe[last] < 0.5 * rest.length) && (
@@ -228,11 +254,18 @@ export default function Valuation() {
 
       {/* KPI cards */}
       <section className="grid grid-cols-2 gap-3 lg:grid-cols-4" aria-label="Key valuation figures">
-        {[["Weighted P/E", w && last >= 0 ? w.pe[last] : null, "Capitalization-weighted"], ["Median P/E", medPe, `${excluded.length ? "Remaining" : "All"} ${scopeId} stocks`],
-          ["Weighted P/B", w && last >= 0 ? w.pb[last] : null, "Capitalization-weighted"], ["Median P/B", medPb, `${excluded.length ? "Remaining" : "All"} ${scopeId} stocks`]].map(([l, v, n]) => (
-          <div key={l as string} className="rounded-xl border border-slate-800 bg-slate-900 p-4">
-            <div className="text-[11px] font-medium uppercase tracking-wide text-slate-400">{scopeId} {l as string}</div>
-            <div className="mt-1 text-3xl font-bold tabular-nums text-sky-600 dark:text-sky-400">{fmt(v as number | null, 2)}</div>
+        {[
+          ["Weighted P/E", w && last >= 0 ? w.pe[last] : null, "Capitalization-weighted", true],
+          ["Median P/E", medPe, `${excluded.length ? "Remaining" : "All"} ${scopeId} stocks`, false],
+          ["Weighted P/B", w && last >= 0 ? w.pb[last] : null, "Capitalization-weighted", true],
+          ["Median P/B", medPb, `${excluded.length ? "Remaining" : "All"} ${scopeId} stocks`, false],
+        ].map(([l, v, n, isWeighted]) => (
+          <div
+            key={l as string}
+            className={`rounded-xl border border-slate-800 border-t-2 ${isWeighted ? "border-t-blue-600" : "border-t-emerald-500"} bg-slate-900 p-4 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md`}
+          >
+            <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">{scopeId} {l as string}</div>
+            <div className="mt-1.5 text-3xl font-extrabold tracking-tight tabular-nums text-slate-900 dark:text-slate-100">{fmt(v as number | null, 2)}</div>
             <div className="mt-1 text-xs text-slate-500">{n as string}{excluded.length ? ` · ${excluded.length} group(s) excluded` : ""}</div>
           </div>
         ))}
@@ -242,15 +275,34 @@ export default function Valuation() {
       {Object.entries(special).map(([name, syms]) => {
         const cards = syms.map((s) => stocks.find((r) => r.symbol === s)).filter((r): r is Stock => !!r);
         return cards.length > 0 && (
-          <section key={name} className="rounded-xl border border-slate-800 bg-slate-900 p-4">
-            <h2 className="mb-2 flex items-center gap-2 text-sm font-semibold text-slate-100">{name}<span className="rounded-full bg-blue-600 px-2 py-0.5 text-[10px] font-semibold uppercase text-white">Special group</span></h2>
+          <section key={name} className="rounded-xl border border-blue-200/70 bg-gradient-to-r from-blue-50/50 via-white to-indigo-50/40 p-4 dark:border-blue-900/60 dark:from-slate-900 dark:via-slate-900 dark:to-blue-950/30">
+            <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-900 dark:text-slate-100">
+              {name}
+              <span className="rounded-full bg-blue-600 px-2 py-0.5 text-[10px] font-semibold uppercase text-white">Special group</span>
+            </h2>
             <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
               {cards.map((c) => (
-                <Link key={c.symbol} href={`/stock/${c.symbol}?view=fundamental`} className="rounded-lg border border-sky-500/40 bg-sky-500/5 p-3 text-sm hover:border-sky-500">
-                  <div className="text-lg font-bold text-sky-600 dark:text-sky-300">{c.symbol}</div>
-                  <div className="text-xs text-slate-400">Close: <b className="text-slate-200">{compactVnd(c.close_vnd)}</b></div>
-                  <div className="text-xs text-slate-400">P/E: <b className={peTone(c.pe)}>{fmt(c.pe, 2)}</b></div>
-                  <div className="text-xs text-slate-400">P/B: <b className="text-sky-600 dark:text-sky-300">{fmt(c.pb, 2)}</b></div>
+                <Link
+                  key={c.symbol}
+                  href={`/stock/${c.symbol}?view=fundamental`}
+                  className="rounded-lg border border-slate-200/90 bg-white/90 p-3 text-sm shadow-sm transition hover:border-blue-400 hover:shadow dark:border-slate-800 dark:bg-slate-900/90 dark:hover:border-sky-500"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-base font-bold text-slate-900 dark:text-sky-300">{c.symbol}</span>
+                    <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[11px] font-medium tabular-nums text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                      Close: {compactVnd(c.close_vnd)}
+                    </span>
+                  </div>
+                  <div className="mt-2 grid grid-cols-2 gap-2 border-t border-slate-100 pt-2 dark:border-slate-800">
+                    <div>
+                      <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">P/E</div>
+                      <div className={`text-sm font-bold tabular-nums ${peTone(c.pe)}`}>{fmt(c.pe, 2)}</div>
+                    </div>
+                    <div>
+                      <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">P/B</div>
+                      <div className="text-sm font-bold tabular-nums text-teal-600 dark:text-teal-400">{fmt(c.pb, 2)}</div>
+                    </div>
+                  </div>
                 </Link>
               ))}
             </div>
