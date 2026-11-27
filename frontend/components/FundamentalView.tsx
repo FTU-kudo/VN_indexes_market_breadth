@@ -1,5 +1,6 @@
 // frontend/components/FundamentalView.tsx
 "use client";
+import { BookOpen } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import LineChart, { Pt, Ser } from "@/components/LineChart";
 import { useTheme } from "@/components/ThemeProvider";
@@ -33,31 +34,33 @@ function StatementTable({ stmt, report, count, filter }: { stmt: Stmt; report: s
   const order = stmt.periods.map((_, i) => i).reverse().slice(0, count);   // newest first
   const idxOf = new Map(stmt.periods.map((p, i) => [`${p.y}Q${p.q}`, i]));
   const f = filter.trim().toLowerCase();
-  const show = lines.filter((l) => !f || `${l.vi ?? ""} ${l.en ?? ""}`.toLowerCase().includes(f));
+  const show = lines.filter((l) => !f || `${l.en ?? ""} ${l.vi ?? ""}`.toLowerCase().includes(f));
   const cell = (v: number | null) => (v === null ? "–" : money ? (v / 1000).toLocaleString("en-US", { maximumFractionDigits: 1 }) : v.toLocaleString("en-US", { maximumFractionDigits: 2 }));
   const latest = stmt.periods[order[0]];
+  const isSubtotal = (en: string | null) => !!en && /^(revenue|net revenue|gross profit|operating profit|profit before tax|profit after tax|net profit|total assets|total equity|owner'?s equity|net cash flows? from operating)/i.test(en.trim());
   return (
     <div className="max-h-[70vh] overflow-auto rounded-lg border border-slate-800">
       <table className="w-full min-w-[640px] border-separate border-spacing-0 text-sm tabular-nums">
         <thead>
           <tr>
-            <th className="sticky left-0 top-0 z-20 min-w-[260px] border-b border-r border-slate-800 bg-slate-900 px-3 py-2">{money ? "VND billion" : "As provided"}</th>
-            {money && latest && <th className="sticky top-0 z-10 border-b border-slate-800 bg-slate-900 px-3 py-2 text-right" title={`Change of Q${latest.q} ${latest.y} vs Q${latest.q} ${latest.y - 1}`}>YoY</th>}
-            {order.map((i) => <th key={i} className="sticky top-0 z-10 border-b border-slate-800 bg-slate-900 px-3 py-2 text-right">Q{stmt.periods[i].q} {stmt.periods[i].y}</th>)}
+            <th className="sticky left-0 top-0 z-20 min-w-[260px] border-b border-r border-slate-800 bg-slate-900/95 px-3 py-2 backdrop-blur-sm">{money ? "VND billion" : "As provided"}</th>
+            {money && latest && <th className="sticky top-0 z-10 border-b border-slate-800 bg-slate-900/95 px-3 py-2 text-right backdrop-blur-sm" title={`Change of Q${latest.q} ${latest.y} vs Q${latest.q} ${latest.y - 1}`}>YoY</th>}
+            {order.map((i) => <th key={i} className="sticky top-0 z-10 border-b border-slate-800 bg-slate-900/95 px-3 py-2 text-right backdrop-blur-sm">Q{stmt.periods[i].q} {stmt.periods[i].y}</th>)}
           </tr>
         </thead>
         <tbody>
           {show.map((l, k) => {
             const a = latest ? l.v[order[0]] : null, j = latest ? idxOf.get(`${latest.y - 1}Q${latest.q}`) : undefined, b = j === undefined ? null : l.v[j];
             const yoy = a !== null && b !== null && b > 0 ? (a / b - 1) * 100 : null;
+            const sub = isSubtotal(l.en);
             return (
-              <tr key={`${l.id}-${k}`} className="odd:bg-slate-950 even:bg-slate-900">
-                <td className="sticky left-0 z-10 border-r border-slate-800 bg-inherit px-3 py-1.5">
-                  <div className="text-slate-100">{l.vi || l.en}</div>
-                  {l.vi && l.en && <div className="text-[11px] text-slate-500">{l.en}</div>}
+              <tr key={`${l.id}-${k}`} className={sub ? "bg-slate-950/70" : "odd:bg-slate-950 even:bg-slate-900"}>
+                <td className="sticky left-0 z-10 border-r border-slate-800 bg-inherit px-3 py-2">
+                  <div className={`text-[13.5px] leading-snug text-slate-100 sm:text-sm ${sub ? "font-bold" : "font-semibold"}`}>{l.en || l.vi}</div>
+                  {l.en && l.vi && <div className="mt-0.5 text-[11.5px] font-normal leading-tight text-slate-400">{l.vi}</div>}
                 </td>
-                {money && <td className={`px-3 py-1.5 text-right ${yoy === null ? "text-slate-500" : yoy >= 0 ? pos : neg}`}>{yoy === null ? "–" : `${yoy > 0 ? "+" : "−"}${Math.abs(yoy).toFixed(1)}%`}</td>}
-                {order.map((i) => { const v = l.v[i]; return <td key={i} className={`px-3 py-1.5 text-right ${v !== null && v < 0 ? neg : "text-slate-200"}`}>{cell(v)}</td>; })}
+                {money && <td className={`px-3 py-2 text-right tabular-nums ${yoy === null ? "text-slate-500" : yoy >= 0 ? pos : neg}`}>{yoy === null ? "–" : `${yoy > 0 ? "+" : "−"}${Math.abs(yoy).toFixed(1)}%`}</td>}
+                {order.map((i) => { const v = l.v[i]; return <td key={i} className={`px-3 py-2 text-right tabular-nums ${v !== null && v < 0 ? neg : "text-slate-200"}`}>{cell(v)}</td>; })}
               </tr>
             );
           })}
@@ -189,10 +192,23 @@ export default function FundamentalView({ sym }: { sym: string }) {
             {stmt.loading ? <Loading what="statements" /> : stmt.data && tabs.length ? <StatementTable stmt={stmt.data} report={tab} count={count} filter={filter} />
               : <p className="text-sm text-slate-500">Statements are not stored for {sym} yet. Run <b>Fundamentals update</b> with “full” ticked to load them.</p>}
           </section>
-          <p className="text-xs text-slate-500">
-            P/E = market cap ÷ trailing-12-month profit attributable to parent shareholders; P/B = market cap ÷ parent equity; market cap uses the latest share count (contributed capital ÷ 10,000 VND).
-            Each report is applied from its assumed filing date (quarter end plus the legal deadline), so ratios may react a little later than the real filing. Cash-flow figures may be year-to-date.
-          </p>
+          <section className="mt-4 rounded-xl border border-slate-800 bg-slate-950/90 p-4">
+            <h3 className="mb-2.5 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-slate-200">
+              <BookOpen className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" aria-hidden />
+              Methodology &amp; Filing Notes
+            </h3>
+            <div className="grid grid-cols-1 gap-3 text-xs leading-relaxed text-slate-400 lg:grid-cols-2">
+              <div className="space-y-1.5">
+                <p><b className="font-bold text-blue-700 dark:text-blue-400">P/E Formula:</b> Market cap ÷ trailing-12-month (TTM) profit attributable to parent shareholders.</p>
+                <p><b className="font-bold text-teal-700 dark:text-teal-400">P/B Formula:</b> Market cap ÷ parent equity.</p>
+                <p><b className="font-semibold text-slate-200">Market Cap Basis:</b> Calculated using the latest share count (contributed capital ÷ 10,000 VND).</p>
+              </div>
+              <div className="space-y-1.5">
+                <p><b className="font-semibold text-slate-200">Assumed Filing Date:</b> Each report is applied from its assumed filing date (quarter-end + statutory filing deadline), so valuation ratios may reflect new earnings slightly after the actual release date.</p>
+                <p><b className="font-semibold text-slate-200">Cash Flow Basis:</b> Cash-flow statement figures may be reported on a year-to-date (YTD) cumulative basis.</p>
+              </div>
+            </div>
+          </section>
         </>
       )}
     </div>
