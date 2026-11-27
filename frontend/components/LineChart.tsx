@@ -1,7 +1,7 @@
 // frontend/components/LineChart.tsx
 "use client";
-import { ColorType, createChart, LineStyle } from "lightweight-charts";
-import { ReactNode, useEffect, useRef } from "react";
+import { ColorType, createChart, ISeriesApi, LineStyle } from "lightweight-charts";
+import { ReactNode, useEffect, useRef, useState } from "react";
 import { useTheme } from "./ThemeProvider";
 
 export type Pt = { time: string; value: number | null; color?: string };
@@ -21,34 +21,68 @@ export default function LineChart({ series, height = 260, hlines = NO_LINES, tit
   series: Ser[]; height?: number; hlines?: { value: number; color?: string }[]; title?: string; actions?: ReactNode;
 }) {
   const ref = useRef<HTMLDivElement>(null);
+  const seriesRefs = useRef<Map<string, ISeriesApi<"Line" | "Histogram">>>(new Map());
+  const [hidden, setHidden] = useState<Record<string, boolean>>({});
   const { theme } = useTheme();
+
   useEffect(() => {
     if (!ref.current) return;
     const chart = createChart(ref.current, chartOptions(height, theme === "dark"));
+    const map = new Map<string, ISeriesApi<"Line" | "Histogram">>();
     if (series.some((s) => s.scale === "left")) chart.applyOptions({ leftPriceScale: { visible: true, borderColor: theme === "dark" ? "#333a47" : "#d6dbe3" } });
     series.forEach((s, idx) => {
       // missing values become whitespace so gaps stay gaps (nulls used to be dropped and the line was drawn straight across them)
       const clean = s.data.map((p) => (p.value === null ? { time: p.time } : { time: p.time, value: p.value as number, ...(p.color ? { color: p.color } : {}) }));
+      const visible = !hidden[s.name];
       if (s.kind === "hist") {
-        chart.addHistogramSeries({ color: s.color, priceFormat: { type: "price", precision: 2, minMove: 0.01 } }).setData(clean);
+        const h = chart.addHistogramSeries({ color: s.color, visible, priceFormat: { type: "price", precision: 2, minMove: 0.01 } });
+        h.setData(clean);
+        map.set(s.name, h);
       } else {
-        const l = chart.addLineSeries({ color: s.color, lineWidth: (s.width ?? 2) as 1 | 2 | 3 | 4, priceLineVisible: false, priceScaleId: s.scale ?? "right", lineStyle: s.dashed ? LineStyle.Dashed : LineStyle.Solid });
+        const l = chart.addLineSeries({ color: s.color, visible, lineWidth: (s.width ?? 2) as 1 | 2 | 3 | 4, priceLineVisible: false, priceScaleId: s.scale ?? "right", lineStyle: s.dashed ? LineStyle.Dashed : LineStyle.Solid });
         l.setData(clean);
+        map.set(s.name, l);
         if (idx === 0) hlines.forEach((h) => l.createPriceLine({ price: h.value, color: h.color ?? "#475569", lineStyle: LineStyle.Dashed, lineWidth: 1, axisLabelVisible: true, title: "" }));
       }
     });
+    seriesRefs.current = map;
     chart.timeScale().fitContent();
-    return () => chart.remove();
+    return () => { seriesRefs.current.clear(); chart.remove(); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [series, height, hlines, theme]);
+
+  useEffect(() => {
+    seriesRefs.current.forEach((api, name) => {
+      api.applyOptions({ visible: !hidden[name] });
+    });
+  }, [hidden]);
+
+  const toggle = (name: string) => setHidden((prev) => ({ ...prev, [name]: !prev[name] }));
+
   return (
-    <div className="rounded-xl border border-slate-800 bg-slate-900 p-2">
-      <div className="mb-1 flex flex-wrap items-center gap-3 text-xs">
-        {title && <span className="font-semibold text-slate-200">{title}</span>}
-        {series.map((s) => (
-          <span key={s.name} className="flex items-center gap-1 text-slate-400">
-            <i className="inline-block h-2 w-3 rounded-sm" style={{ background: s.color }} />{s.name}
-          </span>
-        ))}
+    <div className="rounded-xl border border-slate-800 bg-slate-900 p-3 shadow-sm">
+      <div className="mb-2 flex flex-wrap items-center gap-2 text-xs">
+        {title && <span className="mr-1 font-bold text-slate-100">{title}</span>}
+        {series.map((s) => {
+          const isHidden = !!hidden[s.name];
+          return (
+            <button
+              key={s.name}
+              type="button"
+              onClick={() => toggle(s.name)}
+              aria-pressed={!isHidden}
+              title="Click to show/hide"
+              className={`inline-flex cursor-pointer select-none items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs transition-all ${
+                isHidden
+                  ? "border-slate-800 bg-slate-900 font-medium text-slate-500 line-through hover:border-slate-700 hover:text-slate-300"
+                  : "border-slate-700 bg-slate-950 font-semibold text-slate-100 hover:border-slate-600"
+              }`}
+            >
+              <i className={`inline-block h-2 w-2.5 rounded-sm transition-opacity ${isHidden ? "opacity-35" : ""}`} style={{ background: s.color }} aria-hidden />
+              {s.name}
+            </button>
+          );
+        })}
         {actions && <div className="ml-auto">{actions}</div>}
       </div>
       <div ref={ref} style={{ height }} />
