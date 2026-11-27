@@ -73,7 +73,7 @@ export default function Valuation() {
   const cons = useJSON<{ indexes: Record<string, string[]> }>("constituents.json");
   const [scopeId, setScopeId] = useState("HOSE");
   const sc = useJSON<Scope>(`valuation/${scopeId}.json`);
-  const [range, setRange] = useState<number | "ytd">(1260);
+  const [range, setRange] = useState<number | "ytd">(1e9);
   const [excluded, setExcluded] = useState<string[]>([]);
   const [metric, setMetric] = useState<Metric>("wpe");
   const [trendSel, setTrendSel] = useState<string[]>([TOTAL]);
