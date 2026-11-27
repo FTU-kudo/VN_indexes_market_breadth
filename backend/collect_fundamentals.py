@@ -57,14 +57,20 @@ def build_quarters(rows: list[dict]) -> tuple[list[dict], dict]:
             if ta is not None and tl is not None and ta - tl > 0:
                 eq, eq_src = ta - tl, "derived: total assets - total liabilities"
         mi, _ = pick(rs, "minority_interest")
+        ta_, _ = pick(rs, "total_assets")
+        tl_, _ = pick(rs, "total_liabilities")
         cc, cc_src = pick(rs, "charter_capital")
         if ni is None and eq is None and cc is None:
             continue
         end = rs[0]["period_end"]
         pub = next((r["published"] for r in rs if r["published"]), None) or assumed_publish(end, q)
+        # Before 2015 minority interests are a separate line OUTSIDE equity (assets = liabilities + equity + minority); afterwards they are
+        # INSIDE equity. Balance-sheet identity decides: if assets - liabilities - equity is closer to the minority amount than to 0, it is outside.
+        minority_outside = bool(eq is not None and mi and ta_ is not None and tl_ is not None
+                                and abs((ta_ - tl_ - eq) - mi) < abs(ta_ - tl_ - eq))
         out.append({"period_end": end.isoformat(), "published": pub.isoformat(),
                     "net_income_parent": None if ni is None else ni * C.FUND_UNIT,
-                    "equity_parent": None if eq is None else (eq - (mi or 0.0)) * C.FUND_UNIT,
+                    "equity_parent": None if eq is None else (eq if minority_outside else eq - (mi or 0.0)) * C.FUND_UNIT,
                     "shares": None if cc is None or cc <= 0 else cc * C.FUND_UNIT / C.PAR_VALUE_VND})
         sources = {"net_income_parent": ni_src, "equity": eq_src, "charter_capital": cc_src}
     return out, sources
