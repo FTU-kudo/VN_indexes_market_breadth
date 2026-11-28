@@ -77,7 +77,7 @@ FIELDS_EN: dict[str, tuple[str, list[re.Pattern]]] = {
     "equity_total": ("CDKT", _c(
         r"^(total )?(owners |shareholders )?equity$", r"^equity$", r"^owners equity" + r"(?!.*(liabilit|resources))",
         r"^(owners |shareholders )?capital and (reserves|funds)$", r"^equity and (reserves|funds)$")),
-    "minority_interest": ("CDKT", _c(r"(minority|non-?controlling) interests?")),
+    "minority_interest": ("CDKT", _c(r"(minoritys?|non-?controlling) interests?")),
     "charter_capital": ("CDKT", _c(
         r"^(owners )?(contributed|invested|paid-?in|charter|share) capital$", r"^(contributed|invested|paid-?in|charter|share) capital",
         r"^common (stock|shares)( with voting rights)?$", r"^ordinary shares")),
