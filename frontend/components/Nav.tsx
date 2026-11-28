@@ -37,31 +37,35 @@ function NavInner() {
   const secondary = ITEMS.filter((i) => i.secondary);
 
   const linkCls = (active: boolean) =>
-    `inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg px-2.5 py-1.5 text-[13px] transition-all duration-150 ${
+    `group inline-flex items-center gap-2 whitespace-nowrap rounded-lg px-3 py-2 text-[15px] font-semibold transition-all duration-150 ${
       active
-        ? "bg-blue-50/90 font-semibold text-blue-600 ring-1 ring-blue-600/15 dark:bg-blue-950/60 dark:text-blue-400 dark:ring-blue-500/30"
-        : "font-medium text-slate-300 hover:bg-slate-900 hover:text-slate-100"
+        ? "bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md shadow-blue-500/25"
+        : "text-slate-200 hover:bg-blue-50/80 hover:text-blue-600 dark:hover:bg-blue-950/50 dark:hover:text-blue-400"
     }`;
 
   return (
-    <nav className="sticky top-0 z-50 border-b border-slate-800/90 bg-slate-950/85 backdrop-blur-md">
-      <div className="flex h-14 items-center justify-between gap-3 px-4 lg:px-6">
+    <nav className="sticky top-0 z-50 border-b border-slate-800/90 bg-slate-900/90 shadow-sm backdrop-blur-md">
+      <div className="flex h-16 items-center justify-between gap-4 px-4 lg:px-6">
         {/* Zone A: Brand + Nav */}
-        <div className="flex min-w-0 items-center gap-1.5">
-          <Link href="/" className="mr-2 flex shrink-0 items-center gap-2">
-            <svg viewBox="0 0 24 24" className="h-5 w-5 text-blue-600" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden>
-              <path d="M3 16l4-5 4 3 5-7 5 4" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-            <span className="font-semibold tracking-tight text-slate-100">VN Market Intelligence</span>
+        <div className="flex min-w-0 items-center gap-2">
+          <Link href="/" className="mr-3 flex shrink-0 items-center gap-2.5">
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-blue-600 to-indigo-600 text-white shadow-md shadow-blue-500/25">
+              <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2.4" aria-hidden>
+                <path d="M3 16l4-5 4 3 5-7 5 4" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </span>
+            <span className="bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-500 bg-clip-text text-xl font-extrabold tracking-tight text-transparent dark:from-blue-400 dark:via-indigo-400 dark:to-cyan-300">
+              VN Market Intelligence
+            </span>
           </Link>
 
           {/* Desktop full nav (xl+) */}
-          <div className="hidden items-center gap-0.5 xl:flex">
+          <div className="hidden items-center gap-1.5 xl:flex">
             {ITEMS.map((item) => {
               const Icon = item.icon;
               return (
                 <Link key={item.label} href={item.href} title={item.title} className={linkCls(item.match(p, fundamental))}>
-                  <Icon className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                  <Icon className="h-4 w-4 shrink-0" aria-hidden />
                   <span>{item.label}</span>
                 </Link>
               );
@@ -69,12 +73,12 @@ function NavInner() {
           </div>
 
           {/* Medium viewport nav (md to xl) with More dropdown */}
-          <div className="hidden items-center gap-0.5 md:flex xl:hidden">
+          <div className="hidden items-center gap-1.5 md:flex xl:hidden">
             {primary.map((item) => {
               const Icon = item.icon;
               return (
                 <Link key={item.label} href={item.href} title={item.title} className={linkCls(item.match(p, fundamental))}>
-                  <Icon className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                  <Icon className="h-4 w-4 shrink-0" aria-hidden />
                   <span>{item.label}</span>
                 </Link>
               );
