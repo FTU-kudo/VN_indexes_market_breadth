@@ -50,7 +50,7 @@ export default function TickerCommandSearch() {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="inline-flex h-8 items-center gap-2 rounded-lg border border-slate-700/80 bg-slate-900 px-2.5 text-xs text-slate-400 transition hover:border-slate-600 hover:text-slate-100"
+        className="inline-flex h-9 items-center gap-2 rounded-lg border border-slate-700/80 bg-slate-900 px-3 text-xs text-slate-400 transition hover:border-slate-600 hover:text-slate-100"
         aria-label="Quick ticker search"
       >
         <Search className="h-3.5 w-3.5 shrink-0" aria-hidden />
