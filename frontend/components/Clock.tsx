@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 
 const TZ = "Asia/Ho_Chi_Minh";
 const time = new Intl.DateTimeFormat("en-GB", { timeZone: TZ, hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false });
-const date = new Intl.DateTimeFormat("en-GB", { timeZone: TZ, weekday: "short", day: "2-digit", month: "short", year: "numeric" });
+const date = new Intl.DateTimeFormat("en-GB", { timeZone: TZ, weekday: "short", day: "2-digit", month: "short" });
 const vnParts = new Intl.DateTimeFormat("en-US", { timeZone: TZ, weekday: "short", hour: "2-digit", minute: "2-digit", hour12: false });
 
 function isMarketOpen(d: Date | null): boolean {
@@ -48,7 +48,7 @@ export default function Clock() {
       </span>
       <span className="hidden h-3.5 w-px bg-slate-700 sm:block" aria-hidden />
       <span className="hidden text-xs font-medium text-slate-400 sm:inline">
-        {d ? date.format(d) : ""} · GMT+7
+        {d ? date.format(d) : ""}
       </span>
     </div>
   );
