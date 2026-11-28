@@ -32,7 +32,7 @@ function NavInner() {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   const linkCls = (active: boolean) =>
-    `group inline-flex shrink-0 items-center gap-2 whitespace-nowrap rounded-lg px-3 py-1.5 text-[15px] font-semibold transition-all duration-150 ${
+    `group inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg px-2.5 py-1.5 text-[13px] font-semibold transition-all duration-150 ${
       active
         ? "bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md shadow-blue-500/25"
         : "text-slate-200 hover:bg-blue-50/80 hover:text-blue-600 dark:hover:bg-blue-950/50 dark:hover:text-blue-400"
@@ -40,20 +40,35 @@ function NavInner() {
 
   return (
     <header className="sticky top-0 z-50 border-b border-slate-800/90 bg-slate-900/90 shadow-sm backdrop-blur-md">
-      {/* Row 1: Brand + Global Utilities */}
-      <div className="flex h-14 items-center justify-between gap-4 px-4 lg:px-6">
-        <Link href="/" className="flex shrink-0 items-center gap-2.5">
-          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-blue-600 to-indigo-600 text-white shadow-md shadow-blue-500/25">
-            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2.4" aria-hidden>
-              <path d="M3 16l4-5 4 3 5-7 5 4" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          </span>
-          <span className="bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-500 bg-clip-text text-xl font-extrabold tracking-tight text-transparent dark:from-blue-400 dark:via-indigo-400 dark:to-cyan-300">
-            VN Market Intelligence
-          </span>
-        </Link>
+      <div className="flex h-14 w-full flex-nowrap items-center justify-between gap-3 whitespace-nowrap px-4">
+        {/* Left: Brand + 7 Nav Tabs */}
+        <div className="flex min-w-0 items-center gap-3">
+          <Link href="/" className="flex shrink-0 items-center gap-2">
+            <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-blue-600 to-indigo-600 text-white shadow-md shadow-blue-500/25">
+              <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2.4" aria-hidden>
+                <path d="M3 16l4-5 4 3 5-7 5 4" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </span>
+            <span className="bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-500 bg-clip-text text-[17px] font-extrabold tracking-tight text-transparent dark:from-blue-400 dark:via-indigo-400 dark:to-cyan-300">
+              VN Market Intelligence
+            </span>
+          </Link>
 
-        <div className="flex shrink-0 items-center gap-2.5">
+          <nav className="hidden items-center gap-1 lg:flex">
+            {ITEMS.map((item) => {
+              const Icon = item.icon;
+              return (
+                <Link key={item.label} href={item.href} title={item.title} className={linkCls(item.match(p, fundamental))}>
+                  <Icon className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                  <span>{item.label}</span>
+                </Link>
+              );
+            })}
+          </nav>
+        </div>
+
+        {/* Right: Compact Utilities */}
+        <div className="flex shrink-0 items-center gap-2">
           <TickerCommandSearch />
           <div className="hidden sm:block">
             <Clock />
@@ -64,29 +79,16 @@ function NavInner() {
             type="button"
             onClick={() => setMobileOpen((v) => !v)}
             aria-label="Toggle navigation"
-            className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-300 hover:bg-slate-950 md:hidden"
+            className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-300 hover:bg-slate-950 lg:hidden"
           >
             {mobileOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
           </button>
         </div>
       </div>
 
-      {/* Row 2: Full-width Navigation Tabs (md+) */}
-      <nav className="hidden border-t border-slate-800/60 px-4 py-1.5 md:flex md:items-center md:gap-1.5 md:overflow-x-auto lg:px-6">
-        {ITEMS.map((item) => {
-          const Icon = item.icon;
-          return (
-            <Link key={item.label} href={item.href} title={item.title} className={linkCls(item.match(p, fundamental))}>
-              <Icon className="h-4 w-4 shrink-0" aria-hidden />
-              <span>{item.label}</span>
-            </Link>
-          );
-        })}
-      </nav>
-
-      {/* Mobile drawer */}
+      {/* Mobile / Tablet drawer */}
       {mobileOpen && (
-        <nav className="space-y-1 border-t border-slate-800 bg-slate-950 px-4 py-3 md:hidden">
+        <nav className="space-y-1 border-t border-slate-800 bg-slate-950 px-4 py-3 lg:hidden">
           {ITEMS.map((item) => {
             const Icon = item.icon;
             return (
@@ -108,5 +110,5 @@ function NavInner() {
 }
 
 export default function Nav() {
-  return <Suspense fallback={<header className="h-24 border-b border-slate-800" />}><NavInner /></Suspense>;
+  return <Suspense fallback={<header className="h-14 border-b border-slate-800" />}><NavInner /></Suspense>;
 }

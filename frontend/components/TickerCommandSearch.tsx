@@ -50,11 +50,13 @@ export default function TickerCommandSearch() {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="inline-flex h-9 items-center gap-2 rounded-lg border border-slate-700/80 bg-slate-900 px-3 text-xs text-slate-400 transition hover:border-slate-600 hover:text-slate-100"
+        className="inline-flex h-8 items-center justify-between gap-2 rounded-lg border border-slate-700/80 bg-slate-900 px-2.5 text-xs text-slate-400 transition hover:border-slate-600 hover:text-slate-100 xl:w-36"
         aria-label="Quick ticker search"
       >
-        <Search className="h-3.5 w-3.5 shrink-0" aria-hidden />
-        <span className="hidden sm:inline">Search ticker...</span>
+        <span className="inline-flex items-center gap-1.5">
+          <Search className="h-3.5 w-3.5 shrink-0" aria-hidden />
+          <span className="hidden sm:inline">Search...</span>
+        </span>
         <kbd className="hidden rounded border border-slate-700 bg-slate-950 px-1.5 py-0.5 font-sans text-[10px] font-semibold text-slate-400 lg:inline">⌘K</kbd>
       </button>
 
