@@ -53,9 +53,6 @@ function NavInner() {
               <path d="M3 16l4-5 4 3 5-7 5 4" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
             <span className="font-semibold tracking-tight text-slate-100">VN Market Intelligence</span>
-            <span className="hidden rounded border border-blue-200/60 bg-blue-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-blue-700 dark:border-blue-800/60 dark:bg-blue-950/60 dark:text-blue-300 xl:inline">
-              VN-INDEX
-            </span>
           </Link>
 
           {/* Desktop full nav (xl+) */}
